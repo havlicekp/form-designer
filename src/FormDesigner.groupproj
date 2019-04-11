@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{09BEAE01-9B0C-4609-8CD2-86C0B619DA28}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="FormDesigner.Demo\FormDesigner.Demo.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="FormDesigner.Package\FormDesigner.Package.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="FormDesigner_Demo">
+        <MSBuild Projects="FormDesigner.Demo\FormDesigner.Demo.dproj"/>
+    </Target>
+    <Target Name="FormDesigner_Demo:Clean">
+        <MSBuild Projects="FormDesigner.Demo\FormDesigner.Demo.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FormDesigner_Demo:Make">
+        <MSBuild Projects="FormDesigner.Demo\FormDesigner.Demo.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="FormDesigner_Package">
+        <MSBuild Projects="FormDesigner.Package\FormDesigner.Package.dproj"/>
+    </Target>
+    <Target Name="FormDesigner_Package:Clean">
+        <MSBuild Projects="FormDesigner.Package\FormDesigner.Package.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FormDesigner_Package:Make">
+        <MSBuild Projects="FormDesigner.Package\FormDesigner.Package.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="FormDesigner_Demo;FormDesigner_Package"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="FormDesigner_Demo:Clean;FormDesigner_Package:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="FormDesigner_Demo:Make;FormDesigner_Package:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
