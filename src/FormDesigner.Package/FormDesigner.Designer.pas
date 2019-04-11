@@ -303,7 +303,7 @@ begin
   begin
     Log('Sizer', 'Draw FRect.Left: %d, FRect.Top: %d, FOldRect.Left: %d, FOldRect.Top: %d', [FRect.Left, FRect.Top, FOldRect.Left, FOldRect.Top]);
     DC := GetDC(FParent.Handle);
-    DrawFocusRect(DC, FOldRect);
+    //DrawFocusRect(DC, FOldRect);
     DrawFocusRect(DC, FRect);
     FOldRect := FRect;
   end;
@@ -595,12 +595,12 @@ begin
   begin
     CursorPos := Mouse.CursorPos;
     Control := Controls.FindVCLWindow(CursorPos);
-    if (Control <> nil) then
+    if (Control <> nil) and not (Control is TMark) then
     begin
       Child := TWinControl(Control).ControlAtPos(Control.ScreenToClient(CursorPos), True);
       if Assigned(Child) then
         Control := Child;
-      if (Control = FLastHintedControl) or (Control is TForm) then
+      if (Control = FLastHintedControl) or (Control is TForm) or (Control is TMark) then
         Exit;
       FLastHintedControl := Control;
       FToolTip.Description := Format('%s: %s%sOrigin: %d, %d; Size: %d, %d', [Control.Name, Control.ClassName, sLineBreak, Control.Left, Control.Top, Control.Width, Control.Height, sLineBreak]);
