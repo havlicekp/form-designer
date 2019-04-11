@@ -10,6 +10,7 @@ uses
 type
   TfrmDesignForm = class(TForm)
     fdDesigner: TFormDesigner;
+    Button1: TButton;
     procedure FormActivate(Sender: TObject);
   private
     { Private declarations }

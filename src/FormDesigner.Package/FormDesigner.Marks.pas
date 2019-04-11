@@ -260,6 +260,7 @@ var
 begin
   Rect := FFormDesigner.GetRect();
   ChildRect := FFormDesigner.GetChildRect();
+    Log('TDownMark', 'ChildRect (%d, %d, %d, %d), Rect (%d, %d, %d, %d)', [ChildRect.Left, ChildRect.Top, ChildRect.Right, ChildRect.Bottom, Rect.Left, Rect.Top, Rect.Right, Rect.Bottom]);
   with Rect do
   begin
     if (Y <> Rect.Bottom) and (Y <> Rect.Top) then
@@ -277,6 +278,7 @@ begin
       FFormDesigner.UpdateRect(Rect, dDown, Rect.Bottom, Rect.Top);
     end;
   end;
+      Log('TDownMark', 'ChildRect (%d, %d, %d, %d), Rect (%d, %d, %d, %d)', [ChildRect.Left, ChildRect.Top, ChildRect.Right, ChildRect.Bottom, Rect.Left, Rect.Top, Rect.Right, Rect.Bottom]);
 end;
 
 procedure TRightMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);

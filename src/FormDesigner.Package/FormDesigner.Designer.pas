@@ -48,7 +48,6 @@ type
     FOnEndChange: TEndChange;
     FOnChildClick: TChildClick;
     FOnRectDrawed: TRectDrawed;
-    FOldKeyDown: TKeyEvent;
     FApplicationEvents: TApplicationEvents;
     FForm: TForm;
     FCurrentMark: TMark;
@@ -64,6 +63,7 @@ type
     FLastHintedControl: TControl;
     FOldRect: TRect;
     FControlToAdd: TControl;
+    FControlToAddRect: TRect;
     procedure SetChild(Value: TControl);
     procedure SetMarkSize(Value: byte);
     procedure SetVisible(Value: Boolean);
@@ -99,7 +99,7 @@ type
     procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer);
     procedure OnLButtonDownHandler(Sender: TControl; X, Y: integer);
     procedure OnKeyDownHandler(Sender: TControl; Key: Word; Shift: TShiftState);
-    procedure StartSizing(Mark: TMark; UseEmptyRect: Boolean = False);
+    procedure StartSizing(Mark: TMark);
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
   published
@@ -134,9 +134,6 @@ type
 const
   MarkClasses: array [0 .. 7] of TMarkClass = (TUpMark, TDownMark, TLeftMark,
     TRightMark, TUpLeftMark, TUpRightMark, TDownLeftMark, TDownRightMark);
-
-var
-  HOnKeyDown: TKeyDown;
 
 implementation
 
@@ -214,8 +211,6 @@ begin
     InsertComponent(Mark);
   end;
 
-  HOnKeyDown := OnKeyDownHandler;
-
   if not (csDesigning in ComponentState) then
   begin
     FApplicationEvents := TApplicationEvents.Create(nil);
@@ -259,7 +254,7 @@ begin
   ClientToScreen(Handle, TPoint(FRect.TopLeft));
   ClientToScreen(Handle, TPoint(FRect.BottomRight));
   Windows.ClipCursor(@FRect);
-  //FRect := FChild.BoundsRect;
+  FRect := FChild.BoundsRect;
 end;
 
 procedure TFormDesigner.OnLButtonUpHandler(Update: Boolean);
@@ -268,7 +263,10 @@ begin
     Exit;
 
   if Assigned(FChild) then
+  begin
+    Log('Sizer', 'DrawFocusRect: FOldRect (%d, %d, %d, %d)', [FOldRect.Left, FOldRect.Top, FOldRect.Right, FOldRect.Bottom]);
     DrawFocusRect(GetDC(FChild.Parent.Handle), FOldRect);
+  end;
 
   FState := ssReady;
   Windows.ClipCursor(nil);
@@ -288,8 +286,13 @@ begin
   FToolTip.HideHint;
   if Assigned(FControlToAdd) then
   begin
+    if (FControlToAdd.Width = 0) and (FControlToAdd.Height = 0) then
+    begin
+      FControlToAdd.Width := FControlToAddRect.Width;
+      FControlToAdd.Height := FControlToAddRect.Height;
+      Child := FControlToAdd;
+    end;
     FControlToAdd.Visible := True;
-    FControlToAdd.BoundsRect := FRect;
     AddControl(FControlToAdd);
     FControlToAdd := nil;
   end;
@@ -301,9 +304,10 @@ var
 begin
   if not(FChild is TForm) and (FDragMode = dmDeferred) then
   begin
-    Log('Sizer', 'Draw FRect.Left: %d, FRect.Top: %d, FOldRect.Left: %d, FOldRect.Top: %d', [FRect.Left, FRect.Top, FOldRect.Left, FOldRect.Top]);
     DC := GetDC(FParent.Handle);
-    //DrawFocusRect(DC, FOldRect);
+    Log('Sizer', 'Draw FOldRect (%d, %d, %d, %d)', [FOldRect.Left, FOldRect.Top, FOldRect.Right, FOldRect.Bottom]);
+    DrawFocusRect(DC, FOldRect);
+    Log('Sizer', 'Draw FRect (%d, %d, %d, %d)', [FRect.Left, FRect.Top, FRect.Right, FRect.Bottom]);
     DrawFocusRect(DC, FRect);
     FOldRect := FRect;
   end;
@@ -423,27 +427,25 @@ begin
           end;
       end;
   end;
-  if Assigned(FOldKeyDown) then
-    FOldKeyDown(Sender, Key, Shift);
 end;
 
-procedure TFormDesigner.StartSizing(Mark: TMark; UseEmptyRect: Boolean = False);
+procedure TFormDesigner.StartSizing(Mark: TMark);
 begin
   FCurrentMark := Mark;
   SetVisible(False);
   Application.ProcessMessages;
   SetState(ssSizing);
   ClipCursor;
-  if (UseEmptyRect) then
-    FRect := TRect.Empty
-  else
-    FRect := FChild.BoundsRect;
+  FRect := FChild.BoundsRect;
+  FOldRect := TRect.Empty;
+  Draw;
   Log('StartSizing', 'Mark: %s', [Mark.ClassName]);
 end;
 
 procedure TFormDesigner.AddControl(ControlClass: TControlClass);
 begin
   FControlToAdd := ControlClass.Create(FForm);
+  FControlToAddRect := FControlToAdd.BoundsRect;
 end;
 
 procedure TFormDesigner.AddControl(Control: TControl);
@@ -522,7 +524,7 @@ begin
   Log('Sizer', 'OnMouseMoveHandler: X: %d, Y: %d, FClickX: %d, FClickY: %d', [X, Y, FClickX, FClickY]);
 
   FLastMouseMove := Now;
-  //Draw;
+  Draw;
 
   if (FSnapToGrid) then
   begin
@@ -603,7 +605,7 @@ begin
       if (Control = FLastHintedControl) or (Control is TForm) or (Control is TMark) then
         Exit;
       FLastHintedControl := Control;
-      FToolTip.Description := Format('%s: %s%sOrigin: %d, %d; Size: %d, %d', [Control.Name, Control.ClassName, sLineBreak, Control.Left, Control.Top, Control.Width, Control.Height, sLineBreak]);
+      FToolTip.Description := Format('%s: %s%sBounds: %d, %d, %d, %d; Size: %d, %d', [Control.Name, Control.ClassName, sLineBreak, Control.Left, Control.Top, Control.BoundsRect.Right, Control.BoundsRect.Bottom, Control.Width, Control.Height, sLineBreak]);
       CursorPos.Offset(34, 24);
       FToolTip.ShowHint(CursorPos);
     end
@@ -653,7 +655,8 @@ begin
     ForEachMark(procedure (Mark: TMark)
       begin
         Mark.Parent := FParent;
-        BringWindowToTop(Mark.Handle);
+        //BringWindowToTop(Mark.Handle);
+        Mark.BringToFront;
       end);
     UpdateMarks;
   end;
@@ -671,7 +674,7 @@ end;
 procedure TFormDesigner.UpdateRect(Rect: TRect; Direction: TDirections;
 UpperBound: integer; LowerBound: integer);
 begin
-  Log('Sizer', 'Top: %d, Left: %d, Right: %d, Bottom: %d', [Rect.Top, Rect.Left, Rect.Right, Rect.Bottom]);
+  //Log('Sizer', 'Top: %d, Left: %d, Right: %d, Bottom: %d', [Rect.Top, Rect.Left, Rect.Right, Rect.Bottom]);
 
   if (not FSnapToGrid) or (((Direction = dRight) or (Direction = dUpRight) or (Direction = dDownRight)) and (Rect.Right mod FGridGap = 0)) or
       (((Direction = dLeft) or (Direction = dUpLeft) or (Direction = dDownLeft)) and (Rect.Left mod FGridGap = 0)) or
@@ -683,9 +686,9 @@ begin
       ((Direction = dDownRight) and ((Rect.Right mod FGridGap = 0) and (Rect.Bottom mod FGridGap = 0)))}
    then
   begin
-    Draw;
+    //Draw;
     FRect := Rect;
-    Log('Sizer', 'Setting FChild.BoundsRect: X: %d, Y: %d', [FRect.Left, FRect.Top]);
+    Log('Sizer', 'Setting FChild.BoundsRect (%d, %d, %d, %d)', [FRect.Left, FRect.Top, FRect.Right, FRect.Bottom]);
     if (FDragMode = dmImmediate) then
       FChild.BoundsRect := FRect
     else
@@ -785,6 +788,7 @@ procedure TFormDesigner.OnMessageReceived(var msg: tagMSG; var Handled: Boolean)
 var
   Control: TControl;
   Parent: TWinControl;
+  Shift: TShiftState;
 begin
 
   case msg.message of
@@ -804,19 +808,8 @@ begin
         begin
           if (Control is TMark) then
             StartSizing(TMark(Control))
-          {else if Assigned(FControlToAdd) then
-          begin
-            if (csAcceptsControls in Control.ControlStyle) then
-              FParent := TWinControl(Control)
-            else
-              FParent := Control.Parent;
-            StartSizing(MarkOfType(TDownRightMark))
-          end;
-        end}
           else
-          begin
             ProcessMessage(msg, OnLButtonDownHandler);
-          end;
         end;
       end;
 
@@ -826,6 +819,18 @@ begin
       if ((msg.HWnd = FForm.Handle) or (GetParentForm(Control) = FForm)) then
         OnLButtonUpHandler(True);
     end;
+
+    WM_KEYDOWN:
+    begin
+      Control := FindControl(msg.HWnd);
+      if ((msg.HWnd = FForm.Handle) or (GetParentForm(Control) = FForm)) then
+      begin
+        Shift := MsgGetShiftState(msg.wParam, msg.lParam);
+        OnKeyDownHandler(FChild, msg.wParam, Shift);
+      end;
+
+    end;
+
 
   end;
 end;

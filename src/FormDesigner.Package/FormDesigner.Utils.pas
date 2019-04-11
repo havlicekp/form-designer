@@ -31,6 +31,7 @@ procedure Log(const source: string; const message: string); overload;
 procedure Log(const Format: string; const Args: array of const); overload;
 procedure Log(const source: string; const Format: string; const Args: array of const); overload;
 procedure EnumChilds(RootCtrl: TWinControl; Proc: TEnumChildsProc);
+function MsgGetShiftState(wParam: WParam; lParam: LParam): TShiftState;
 
 implementation
 
@@ -154,6 +155,17 @@ var
 begin
   msg := source + ' ' + System.SysUtils.Format(Format, Args);
   Log(msg);
+end;
+
+function MsgGetShiftState(wParam: WParam; lParam: LParam): TShiftState;
+begin
+  Result:=[];
+  if (GetKeyState(VK_SHIFT)<0) then
+    Include(Result,ssShift);
+  if (GetKeyState(VK_CONTROL)<0) then
+    Include(Result,ssCtrl);
+  if (GetKeyState(VK_MENU)<0) then
+    Include(Result,ssAlt);
 end;
 
 end.
