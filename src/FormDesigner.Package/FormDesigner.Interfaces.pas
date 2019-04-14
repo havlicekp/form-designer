@@ -13,7 +13,7 @@ type
     function GetRect(): TRect;
     function GetChildRect(): TRect;
     procedure UpdateRect(Rect: TRect; Direction: TDirections; UpperBound: Integer; LowerBound: Integer);
-    procedure OnKeyDownHandler(Sender: TControl;Key: Word; Shift: TShiftState);
+    procedure OnKeyDownHandler(WindowHandle: HWnd; wParam: WParam; lParam: LParam);
   end;
 
 implementation

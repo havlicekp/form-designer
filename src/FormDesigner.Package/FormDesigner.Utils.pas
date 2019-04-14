@@ -2,7 +2,7 @@ unit FormDesigner.Utils;
 
 interface
 
-uses Classes, Controls, Windows, SysUtils, IOUtils;
+uses Classes, Controls, Windows, SysUtils, IOUtils, WinApi.Messages;
 
 
 type
@@ -27,11 +27,14 @@ function GET_X_LPARAM(lParam: lParam): Integer;
 function GET_Y_LPARAM(lParam: lParam): Integer;
 function GetControlName(Parent: TWinControl; Cls: TClass): String;
 procedure Log(msg: string); overload;
+procedure Log(const source, msg: string; const Rect: TRect); overload;
 procedure Log(const source: string; const message: string); overload;
 procedure Log(const Format: string; const Args: array of const); overload;
 procedure Log(const source: string; const Format: string; const Args: array of const); overload;
+
 procedure EnumChilds(RootCtrl: TWinControl; Proc: TEnumChildsProc);
-function MsgGetShiftState(wParam: WParam; lParam: LParam): TShiftState;
+procedure SetControlText(Control: TControl; Text: String);
+function IsMessageForWindow(MsgHandle: HWnd; WindowHandle: HWnd) : Boolean;
 
 implementation
 
@@ -136,6 +139,11 @@ begin
   {$ENDIF}
 end;
 
+procedure Log(const source, msg: string; const Rect: TRect); overload;
+begin
+  Log(source, msg + ' (%d, %d, %d, %d)', [Rect.Left, Rect.Top, Rect.Right, Rect.Bottom]);
+end;
+
 procedure Log(const source: string; const message: string);
 begin
   Log(source + ' ' + message);
@@ -157,15 +165,25 @@ begin
   Log(msg);
 end;
 
-function MsgGetShiftState(wParam: WParam; lParam: LParam): TShiftState;
+procedure SetControlText(Control: TControl; Text: String);
 begin
-  Result:=[];
-  if (GetKeyState(VK_SHIFT)<0) then
-    Include(Result,ssShift);
-  if (GetKeyState(VK_CONTROL)<0) then
-    Include(Result,ssCtrl);
-  if (GetKeyState(VK_MENU)<0) then
-    Include(Result,ssAlt);
+  Control.Perform(WM_SETTEXT, NativeInt(0), NativeInt(PChar(Text)));
+end;
+
+function IsMessageForWindow(MsgHandle: HWnd; WindowHandle: HWnd) : Boolean;
+var
+  Parent: HWnd;
+begin
+  Result := False;
+  if MsgHandle = WindowHandle then
+  begin
+    Result := True;
+  end
+  else
+  begin
+    Parent := GetAncestor(MsgHandle, GA_ROOT);
+    Result := (Parent <> 0) and (Parent = WindowHandle);
+  end;
 end;
 
 end.

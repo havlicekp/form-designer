@@ -14,7 +14,6 @@ type
   public
     procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); virtual; abstract;
     procedure Update(Control: TControl); virtual; abstract;
-    procedure MarkWindowProc(var msg: TMessage);
     procedure SetProps(ASize: byte; AColor: TColor; AFormDesigner: IFormDesigner);
     procedure Paint; override;
     constructor Create(AOwner: TComponent); override;
@@ -190,24 +189,6 @@ procedure TDownRightMark.Update(Control: TControl);
 begin
   Left := Control.BoundsRect.Right - (Width div 2);
   Top := Control.Top + Control.Height - (Height div 2);
-end;
-
-procedure TMark.MarkWindowProc;
-var
-  Keys: Word;
-begin
-  case msg.msg of
-    {WM_MOUSEMOVE:
-      MoveAction(msg.LParamLo, msg.LParamHi);
-    WM_LBUTTONUP:
-      FFormDesigner.OnLButtonUpHandler(True);}
-    WM_KEYDOWN:
-      begin
-        Keys := Word(msg.wParam);
-        FFormDesigner.OnKeyDownHandler(Self, Keys, KeyDataToShiftState(msg.lParam));
-      end;
-  end;
-  // FFormDesigner.FOldWindowProc(msg);
 end;
 
 procedure TMark.Paint;

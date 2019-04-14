@@ -5,17 +5,13 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FormDesigner.Designer, ComponentsForm,
-  Vcl.StdCtrls;
+  Vcl.StdCtrls, TypInfo, Vcl.ToolWin, Vcl.ComCtrls;
 
 type
   TfrmDesignForm = class(TForm)
     fdDesigner: TFormDesigner;
-    Button1: TButton;
     procedure FormActivate(Sender: TObject);
-  private
-    { Private declarations }
-  public
-    { Public declarations }
+    procedure fdDesignerControlAdded(Sender: TObject);
   end;
 
 var
@@ -25,6 +21,19 @@ var
 implementation
 
 {$R *.dfm}
+
+procedure TfrmDesignForm.fdDesignerControlAdded(Sender: TObject);
+var
+  i: Integer;
+  Button: TToolButton;
+begin
+  for i := 0 to frmComponentsForm.tbControls.ButtonCount - 1 do
+  begin
+    Button := frmComponentsForm.tbControls.Buttons[i];
+    if Button.Down then
+      Button.Down := False;
+  end;
+end;
 
 procedure TfrmDesignForm.FormActivate(Sender: TObject);
 begin
