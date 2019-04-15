@@ -3,12 +3,15 @@ unit FormDesigner.Designer;
 interface
 
 uses Classes, Controls, Graphics, Windows, Messages, Forms, SysUtils, StdCtrls,
-  System.Generics.Collections, Vcl.AppEvnts, FormDesigner.Interfaces,
-  FormDesigner.Utils, FormDesigner.Marks, ExtCtrls, System.DateUtils, TypInfo,
+  System.Generics.Collections, Vcl.AppEvnts, FormDesigner.Interfaces, TypInfo,
+  FormDesigner.Utils, FormDesigner.Marks, ExtCtrls, System.DateUtils,
   RTTI;
 
 type
 
+  ///  <summary></summary
+  ///
+  ///
   TDragMode = (dmImmediate, dmDeferred);
   TMessageHandler = procedure(Sender: TControl; X, Y: integer) of object;
   TMarkProc = reference to procedure(Mark: TMark);
@@ -17,6 +20,7 @@ type
   TWindowProc = function(Wnd: HWnd; msg: DWORD; wParam: wParam; lParam: lParam)
     : LResult; stdcall;
   TControlInfo = class;
+  TRectModifiers = class;
 
   { TFormDesigner }
   TFormDesigner = class(TComponent, IFormDesigner)
@@ -50,6 +54,7 @@ type
     FControlToAddAutoSize: Boolean;
     FOnControlAdded: TNotifyEvent;
     FSizingOrigin: TPoint;
+    FRectModifiers: TRectModifiers;
     procedure CancelSizeMove(WindowHandle: HWnd);
     procedure SetChild(Value: TControl);
     procedure SetMarkSize(Value: byte);
@@ -109,12 +114,41 @@ type
   public
     Sizer: TFormDesigner;
     Control: TControl;
-    // Used to replace Window procedure for Delphi controls
+
+    /// <summary>
+    /// Used to replace Window procedure for Delphi controls
+    /// </summary>
     PrevWndMethod: TWndMethod;
-    // Used to replace Window procedure for controls not managed by Delphi
-    // (like Edit inside a ComboBox)
+
+    /// <summary>
+    /// Used to replace Window procedure for controls not managed by Delphi
+    /// (like Edit inside a ComboBox)
+    /// </summary>
     PrevWindowProc: TWindowProc;
     procedure ControlWindowProc(var msg: TMessage);
+  end;
+
+  /// <summary>
+  /// There are slight differences among TControl.BoundsRect
+  /// For TButton, BoundsRect includes 1px gap around the control, which accomodes focus rectangle
+  /// For TComboBox or TEdit, there is no such gap so the focus rect has to be expanded
+  /// These differences are handled by TRectModifier's</summary>
+  /// </summary>
+  TRectModifier = class
+  public
+   function Modify(var Rect: TRect) : TRect; virtual;
+  end;
+
+  TInflatingRectModifier = class
+  public
+    procedure Modify(var Rect: TRect); override;
+  end;
+
+  TRectModifiers = class
+  public
+    constructor Create;
+    procedure Add(ControlClass: TControlClass; Modifier: TRectModifier);
+    function GetForControl(ControlClass: TControlClass);
   end;
 
 procedure Register;
@@ -172,6 +206,7 @@ end;
 constructor TFormDesigner.Create(AOwner: TComponent);
 var
   MarkClass: TMarkClass;
+  InflatingRectModifier: TRectModifier;
   Mark: TMark;
 begin
   inherited Create(AOwner);
@@ -181,6 +216,15 @@ begin
     FForm := (AOwner as TForm);
 
   FControls := TObjectList<TControlInfo>.Create;
+
+  InflatingRectModifier := TInflatingRectModifier.Create;
+
+  FRectModifiers := TDictionary<TControlClass, TRectModifier>.Create;
+  FRectModifiers.Add(TCustomEdit, InflatingRectModifier);
+  FRectModifiers.Add(TCustomCombo, InflatingRectModifier);
+
+  // Default
+  FRectModifiers.Add(TControl, TRectModifier.Create);
 
   FForm.OnMouseEnter := OnFormMouseEnterHandler;
   FColor := RGB(178, 214, 243);
@@ -236,6 +280,7 @@ begin
   ClientToScreen(Handle, TPoint(FRect.BottomRight));
   Windows.ClipCursor(@FRect);
   FRect := FChild.BoundsRect;
+  //FRect.Inflate(1, 1, 1, 1);
 end;
 
 procedure TFormDesigner.OnLButtonUpHandler(Update: Boolean; var Msg: tagMSG);
@@ -248,9 +293,9 @@ begin
 
     if Assigned(FChild) then
     begin
-      Log('Sizer', 'DrawFocusRect: FOldRect (%d, %d, %d, %d)',
-        [FOldRect.Left, FOldRect.Top, FOldRect.Right, FOldRect.Bottom]);
-      DrawFocusRect(GetDC(FChild.Parent.Handle), FOldRect);
+      Log('Sizer', 'DrawFocusRect: FOldRect', FOldRect);
+      // Remove focust rect used during sizing/moving
+      FChild.Parent.Refresh;
     end;
 
     FState := ssReady;
@@ -295,17 +340,39 @@ end;
 procedure TFormDesigner.Draw;
 var
   DC: HDC;
+  DrawRect, DrawOldRect: TRect;
+  RectModifier: TRectModifier;
 begin
   if not(FChild is TForm) and
     (Assigned(FControlToAdd) or (FDragMode = dmDeferred)) then
   begin
     DC := GetDC(FParent.Handle);
-    Log('Sizer', 'Draw: FOldRect (%d, %d, %d, %d)',
-      [FOldRect.Left, FOldRect.Top, FOldRect.Right, FOldRect.Bottom]);
-    DrawFocusRect(DC, FOldRect);
-    Log('Sizer', 'Draw: FRect (%d, %d, %d, %d)',
-      [FRect.Left, FRect.Top, FRect.Right, FRect.Bottom]);
-    DrawFocusRect(DC, FRect);
+
+    RectModifier := FRectModifiers.GetForControl(FChild);
+
+    {Log('Sizer', 'Draw: FOldRect', FOldRect);
+    if not EqualRect(FOldRect, TRect.Empty) then
+    begin
+      DrawOldRect := FOldRect;
+      DrawOldRect.Inflate(1, 1, 1, 1);
+    end;
+    DrawFocusRect(DC, DrawOldRect);
+
+    Log('Sizer', 'Draw: FRect', FRect);
+    DrawRect := FRect;
+    DrawRect.Inflate(1, 1, 1, 1);
+    DrawFocusRect(DC, DrawRect);
+
+    FOldRect := FRect;}
+
+    Log('Sizer', 'Draw: FOldRect', FOldRect);
+   Kdyz bude Rect empty, tak zadne modify
+   Modify vrati novy TRect, aby nemodifikoval ten predany (nechceme zvetsovat TRect)
+    DrawFocusRect(DC, RectModifier.Modify(FOldRect));
+
+    Log('Sizer', 'Draw: FRect', FRect);
+    DrawFocusRect(DC, RectModifier.Modify(FRect));
+
     FOldRect := FRect;
   end;
 end;
@@ -457,6 +524,7 @@ begin
   MarksVisible := False;
   ClipCursor;
   FRect := FChild.BoundsRect;
+  //FRect.Inflate(1, 1, 1, 1);
   FOldRect := TRect.Empty;
   Application.ProcessMessages;
   Draw;
@@ -727,6 +795,7 @@ begin
     begin
       // Draw;
       FRect := Rect;
+      //FRect.Inflate(-1, -1, 1, 1);
       Log('Sizer', 'Setting FChild.BoundsRect (%d, %d, %d, %d)',
         [FRect.Left, FRect.Top, FRect.Right, FRect.Bottom]);
       if (FDragMode = dmImmediate) then
@@ -978,6 +1047,18 @@ begin
   for i := 0 to ComponentCount - 1 do
     Proc(TMark(Components[i]));
 end;
+
+procedure TRectModifier.Modify(var Rect: TRect);
+begin
+end;
+
+{ TInflatingRectModifier }
+
+procedure TInflatingRectModifier.Modify(var Rect: TRect);
+begin
+  Rect.Inflate(1, 1, 1, 1);
+end;
+
 
 procedure Register;
 begin
