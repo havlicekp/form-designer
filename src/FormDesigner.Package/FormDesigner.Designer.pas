@@ -112,7 +112,7 @@ type
     procedure KeyDownHandler(var msg: tagMSG);
     procedure FocusControl(Control: TControl);
     procedure DrawRect;
-    procedure StartSizing(Mark: TMark);
+    procedure StartSizing(Mark: TMark; MousePos: TPoint);
     property MarksVisible: Boolean read FMarksVisible write SetMarksVisible;
     property Child: TControl read FChild write SetChild;
   public
@@ -431,7 +431,7 @@ procedure TFormDesigner.LButtonDownHandler(Sender: TControl; X, Y: integer);
 begin
 
   FButtonDownOrigin := TPoint.Create(X, Y);
-  //SendMessage(FForm.Handle, WM_SETREDRAW, WPARAM(False), 0);
+
   Log('Sizer', 'OnLButtonDownHandler X: %d, Y: %d', [X, Y]);
   Log('Sizer', 'FRect', FRect);
 
@@ -556,9 +556,10 @@ begin
   end;
 end;
 
-procedure TFormDesigner.StartSizing(Mark: TMark);
+procedure TFormDesigner.StartSizing(Mark: TMark; MousePos: TPoint);
 begin
   FCurrentMark := Mark;
+  Mark.SetSizingOrigin(MousePos.X, MousePos.Y);
   FState := ssSizing;
   MarksVisible := False;
   ClipCursor;
@@ -857,10 +858,11 @@ begin
   begin
     if FState = ssReady then
     begin
-      StartSizing(TMark(Control));
+      StartSizing(TMark(Control), pt);
       Exit;
     end;
   end;
+
   Log('Sizer', 'ProcessMessage: state: %s',
     [TRttiEnumerationType.GetName(FState)]);
 
@@ -887,7 +889,7 @@ begin
     Log('Sizer', 'FControlToAdd', FControlToAdd.BoundsRect);
     FControlToAdd.Parent := Parent;
     Child := FControlToAdd;
-    StartSizing(MarkOfType(TDownRightMark));
+    StartSizing(MarkOfType(TDownRightMark), TPoint.Create(0, 0));
   end
   else if (Control <> nil) then
   begin
