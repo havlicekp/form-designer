@@ -174,7 +174,6 @@ function IsMessageForWindow(MsgHandle: HWnd; WindowHandle: HWnd) : Boolean;
 var
   Parent: HWnd;
 begin
-  Result := False;
   if MsgHandle = WindowHandle then
   begin
     Result := True;

@@ -12,8 +12,7 @@ type
   IFormDesigner = interface
     function GetRect(): TRect;
     function GetChildRect(): TRect;
-    procedure UpdateRect(Rect: TRect; Direction: TDirections; UpperBound: Integer; LowerBound: Integer);
-    procedure OnKeyDownHandler(WindowHandle: HWnd; wParam: WParam; lParam: LParam);
+    procedure UpdateRect(Rect: TRect; Direction: TDirections);
   end;
 
 implementation

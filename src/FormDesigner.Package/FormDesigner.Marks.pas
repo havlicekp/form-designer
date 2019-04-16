@@ -10,9 +10,11 @@ type
   { TMARK }
   TMark = class(TCustomControl)
   private
+    FClickOrigin: TPoint;
     FFormDesigner: IFormDesigner;
   public
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); virtual; abstract;
+    procedure SetSizingOrigin(const X, Y: Integer);
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); virtual; abstract;
     procedure Update(Control: TControl); virtual; abstract;
     procedure SetProps(ASize: byte; AColor: TColor; AFormDesigner: IFormDesigner);
     procedure Paint; override;
@@ -23,7 +25,7 @@ type
   TUpMark = class(TMark)
   public
     procedure Update(Control: TControl); override;
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); override;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -31,7 +33,7 @@ type
   TDownMark = class(TMark)
   public
     procedure Update(Control: TControl); override;
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); override;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -39,7 +41,7 @@ type
   TLeftMark = class(TMark)
   public
     procedure Update(Control: TControl); override;
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); override;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -47,7 +49,7 @@ type
   TRightMark = class(TMark)
   public
     procedure Update(Control: TControl); override;
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); override;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -55,7 +57,7 @@ type
   TUpLeftMark = class(TMark)
   public
     procedure Update(Control: TControl); override;
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); override;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -63,7 +65,7 @@ type
   TUpRightMark = class(TMark)
   public
     procedure Update(Control: TControl); override;
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); override;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -71,7 +73,7 @@ type
   TDownLeftMark = class(TMark)
   public
     procedure Update(Control: TControl); override;
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); override;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -79,7 +81,7 @@ type
   TDownRightMark = class(TMark)
   public
     procedure Update(Control: TControl); override;
-    procedure OnMouseMoveHandler(Sender: TControl; X, Y: integer); override;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -93,6 +95,32 @@ constructor TMark.Create;
 begin
   inherited Create(AOwner);
   Visible := False;
+  FClickOrigin := TPoint.Zero;
+end;
+
+procedure TMark.SetSizingOrigin(const X, Y: Integer);
+var
+  HalfWidth: Integer;
+begin
+  inherited;
+  HalfWidth := Width div 2;
+  if (X <> HalfWidth) then
+  begin
+    if (X > HalfWidth) then
+      FClickOrigin.X := -(X mod HalfWidth)
+    else
+      FClickOrigin.X := HalfWidth - X;
+  end;
+
+  if (Y <> HalfWidth) then
+  begin
+    if (Y > HalfWidth) then
+      FClickOrigin.Y := -(Y mod HalfWidth)
+    else
+      FClickOrigin.Y := HalfWidth - Y;
+  end;
+
+  Log('TMark', 'X: %d, Y: %d, FClickOrigin.X: %d, FClickOrigin.Y: %d', [X, Y, FClickOrigin.X, FClickOrigin.Y]);
 end;
 
 constructor TUpMark.Create;
@@ -208,13 +236,14 @@ begin
   Color := AColor;
 end;
 
-procedure TUpMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TUpMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
 begin
   Rect := FFormDesigner.GetRect();
   ChildRect := FFormDesigner.GetChildRect();
+  Log('TUpMark', 'Orig Rect', Rect);
   with Rect do
   begin
     if (Y <> Top) and (Y <> Bottom) then
@@ -222,47 +251,45 @@ begin
       if Y > ChildRect.Top + ChildRect.Height then
       begin
         Top := ChildRect.Top + ChildRect.Height;
-        Bottom := Y;
+        Bottom := Y + FClickOrigin.Y;
       end
       else
       begin
-        Top := Y;
+        Top := Y + FClickOrigin.Y;
         Bottom := ChildRect.Top + ChildRect.Height;
       end;
-      FFormDesigner.UpdateRect(Rect, dUp, Rect.Top, Rect.Bottom);
+      FFormDesigner.UpdateRect(Rect, dUp);
     end;
   end;
 end;
 
-procedure TDownMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TDownMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
 begin
   Rect := FFormDesigner.GetRect();
   ChildRect := FFormDesigner.GetChildRect();
-    Log('TDownMark', 'ChildRect (%d, %d, %d, %d), Rect (%d, %d, %d, %d)', [ChildRect.Left, ChildRect.Top, ChildRect.Right, ChildRect.Bottom, Rect.Left, Rect.Top, Rect.Right, Rect.Bottom]);
   with Rect do
   begin
     if (Y <> Rect.Bottom) and (Y <> Rect.Top) then
     begin
       if Y < ChildRect.Top then
       begin
-        Rect.Top := Y;
+        Rect.Top := Y + FClickOrigin.Y;
         Rect.Bottom := ChildRect.Top
       end
       else
       begin
-        Rect.Bottom := Y;
+        Rect.Bottom := Y + FClickOrigin.Y;
         Rect.Top := ChildRect.Top
       end;
-      FFormDesigner.UpdateRect(Rect, dDown, Rect.Bottom, Rect.Top);
+      FFormDesigner.UpdateRect(Rect, dDown);
     end;
   end;
-      Log('TDownMark', 'ChildRect (%d, %d, %d, %d), Rect (%d, %d, %d, %d)', [ChildRect.Left, ChildRect.Top, ChildRect.Right, ChildRect.Bottom, Rect.Left, Rect.Top, Rect.Right, Rect.Bottom]);
 end;
 
-procedure TRightMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TRightMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -276,19 +303,19 @@ begin
       if X > ChildRect.Left then
       begin
         Rect.Left := ChildRect.Left;
-        Rect.Right := X;
+        Rect.Right := X + FClickOrigin.X;
       end
       else
       begin
-        Rect.Left := X;
+        Rect.Left := X + FClickOrigin.X;
         Rect.Right := ChildRect.Left;
       end;
-      FFormDesigner.UpdateRect(Rect, dRight, Rect.Right, Rect.Top);
+      FFormDesigner.UpdateRect(Rect, dRight);
     end;
   end;
 end;
 
-procedure TLeftMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TLeftMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -302,19 +329,19 @@ begin
       if X > ChildRect.Left + ChildRect.Width then
       begin
         Rect.Left := ChildRect.Left + ChildRect.Width;
-        Rect.Right := X;
+        Rect.Right := X + FClickOrigin.X;
       end
       else
       begin
-        Rect.Left := X;
+        Rect.Left := X + FClickOrigin.X;
         Rect.Right := ChildRect.Left + ChildRect.Width;
       end;
-      FFormDesigner.UpdateRect(Rect, dLeft, Rect.Left, Rect.Bottom);
+      FFormDesigner.UpdateRect(Rect, dLeft);
     end;
   end;
 end;
 
-procedure TUpLeftMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TUpLeftMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -326,40 +353,40 @@ begin
     if (X < ChildRect.Left + ChildRect.Width) and (Y < ChildRect.Top + ChildRect.Height)
     then
     begin
-      Rect.Left := X;
+      Rect.Left := X + FClickOrigin.X;
       Rect.Bottom := ChildRect.Top + ChildRect.Height;
-      Rect.Top := Y;
+      Rect.Top := Y + FClickOrigin.Y;
       Rect.Right := ChildRect.Left + ChildRect.Width;
     end;
     if (X > ChildRect.Left + ChildRect.Width) and (Y < ChildRect.Top + ChildRect.Height)
     then
     begin
-      Rect.Top := Y;
+      Rect.Top := Y + FClickOrigin.Y;
       Rect.Bottom := ChildRect.Top + ChildRect.Height;
       Rect.Left := ChildRect.Left + ChildRect.Width;
-      Rect.Right := X;
+      Rect.Right := X + FClickOrigin.X;
     end;
     if (X < ChildRect.Left + ChildRect.Width) and (Y > ChildRect.Top + ChildRect.Height)
     then
     begin
       Rect.Top := ChildRect.Top + ChildRect.Height;
-      Rect.Bottom := Y;
-      Rect.Left := X;
+      Rect.Bottom := Y + FClickOrigin.Y;
+      Rect.Left := X + FClickOrigin.X;
       Rect.Right := ChildRect.Left + ChildRect.Width;
     end;
     if (X > ChildRect.Left + ChildRect.Width) and (Y > ChildRect.Top + ChildRect.Height)
     then
     begin
       Rect.Top := ChildRect.Top + ChildRect.Height;
-      Rect.Bottom := Y;
+      Rect.Bottom := Y + FClickOrigin.Y;
       Rect.Left := ChildRect.Left + ChildRect.Width;
-      Rect.Right := X;
+      Rect.Right := X + FClickOrigin.X;
     end;
-    FFormDesigner.UpdateRect(Rect, dUpLeft, Rect.Top, Rect.Left);
+    FFormDesigner.UpdateRect(Rect, dUpLeft);
   end;
 end;
 
-procedure TUpRightMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TUpRightMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -372,35 +399,35 @@ begin
     begin
       Rect.Left := ChildRect.Left;
       Rect.Bottom := ChildRect.Top + ChildRect.Height;
-      Rect.Top := Y;
-      Rect.Right := X;
+      Rect.Top := Y + FClickOrigin.Y;
+      Rect.Right := X + FClickOrigin.X;
     end;
     if (X < ChildRect.Left) and (Y < ChildRect.Top + ChildRect.Height) then
     begin
-      Rect.Top := Y;
+      Rect.Top := Y + FClickOrigin.Y;
       Rect.Bottom := ChildRect.Top + ChildRect.Height;
-      Rect.Left := X;
+      Rect.Left := X + FClickOrigin.X;
       Rect.Right := ChildRect.Left;
     end;
     if (X > ChildRect.Left) and (Y > ChildRect.Top + ChildRect.Height) then
     begin
       Rect.Top := ChildRect.Top + ChildRect.Height;
-      Rect.Bottom := Y;
+      Rect.Bottom := Y + FClickOrigin.Y;
       Rect.Left := ChildRect.Left;
-      Rect.Right := X;
+      Rect.Right := X + FClickOrigin.X;
     end;
     if (X < ChildRect.Left) and (Y > ChildRect.Top + ChildRect.Height) then
     begin
       Rect.Top := ChildRect.Top + ChildRect.Height;
-      Rect.Bottom := Y;
-      Rect.Left := X;
+      Rect.Bottom := Y + FClickOrigin.Y;
+      Rect.Left := X + FClickOrigin.X;
       Rect.Right := ChildRect.Left;
     end;
-    FFormDesigner.UpdateRect(Rect, dUpRight, Rect.Top, Rect.Left);
+    FFormDesigner.UpdateRect(Rect, dUpRight);
   end;
 end;
 
-procedure TDownLeftMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TDownLeftMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -411,73 +438,75 @@ begin
   begin
     if (X < ChildRect.Left + ChildRect.Width) and (Y > ChildRect.Top) then
     begin
-      Rect.Left := X;
-      Rect.Bottom := Y;
+      Rect.Left := X + FClickOrigin.X;
+      Rect.Bottom := Y + FClickOrigin.Y;
       Rect.Top := ChildRect.Top;
       Rect.Right := ChildRect.Left + ChildRect.Width;
     end;
     if (X > ChildRect.Left + ChildRect.Width) and (Y < ChildRect.Top) then
     begin
-      Rect.Top := Y;
+      Rect.Top := Y + FClickOrigin.Y;
       Rect.Bottom := ChildRect.Top;
       Rect.Left := ChildRect.Left + ChildRect.Width;
-      Rect.Right := X;
+      Rect.Right := X + FClickOrigin.X;
     end;
     if (X < ChildRect.Left + ChildRect.Width) and (Y < ChildRect.Top) then
     begin
-      Rect.Top := Y;
+      Rect.Top := Y + FClickOrigin.Y;
       Rect.Bottom := ChildRect.Top;
-      Rect.Left := X;
+      Rect.Left := X + FClickOrigin.X;
       Rect.Right := ChildRect.Left + ChildRect.Width;
     end;
     if (X > ChildRect.Left + ChildRect.Width) and (Y > ChildRect.Top) then
     begin
       Rect.Top := ChildRect.Top;
-      Rect.Bottom := Y;
+      Rect.Bottom := Y + FClickOrigin.Y;
       Rect.Left := ChildRect.Left + ChildRect.Width;
-      Rect.Right := X;
+      Rect.Right := X + FClickOrigin.X;
     end;
-    FFormDesigner.UpdateRect(Rect, dDownLeft, Rect.Left, Rect.Bottom);
+    FFormDesigner.UpdateRect(Rect, dDownLeft);
   end;
 end;
 
-procedure TDownRightMark.OnMouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TDownRightMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
 begin
   Rect := FFormDesigner.GetRect();
+  Log('DonwnRightMark', 'MouseMoveHandler Rect', Rect);
   ChildRect := FFormDesigner.GetChildRect();
+  Log('DonwnRightMark', 'MouseMoveHandler Child', ChildRect);
   with Rect do  begin
     if (X > ChildRect.Left) and (Y > ChildRect.Top) then
     begin
       Rect.Left := ChildRect.Left;
-      Rect.Bottom := Y;
+      Rect.Bottom := Y + FClickOrigin.Y;
       Rect.Top := ChildRect.Top;
-      Rect.Right := X;
+      Rect.Right := X + FClickOrigin.X;
     end;
     if (X < ChildRect.Left) and (Y > ChildRect.Top) then
     begin
       Rect.Top := ChildRect.Top;
-      Rect.Bottom := Y;
-      Rect.Left := X;
+      Rect.Bottom := Y + FClickOrigin.Y;
+      Rect.Left := X + FClickOrigin.X;
       Rect.Right := ChildRect.Left;
     end;
     if (X < ChildRect.Left) and (Y < ChildRect.Top) then
     begin
-      Rect.Top := Y;
+      Rect.Top := Y + FClickOrigin.Y;
       Rect.Bottom := ChildRect.Top;
-      Rect.Left := X;
+      Rect.Left := X + FClickOrigin.X;
       Rect.Right := ChildRect.Left;
     end;
     if (X > ChildRect.Left) and (Y < ChildRect.Top) then
     begin
-      Rect.Top := Y;
+      Rect.Top := Y + FClickOrigin.Y;
       Rect.Bottom := ChildRect.Top;
       Rect.Left := ChildRect.Left;
-      Rect.Right := X;
+      Rect.Right := X + FClickOrigin.X;
     end;
-    FFormDesigner.UpdateRect(Rect, dDownRight, Rect.Left, Rect.Bottom);
+    FFormDesigner.UpdateRect(Rect, dDownRight);
   end;
 end;
 
