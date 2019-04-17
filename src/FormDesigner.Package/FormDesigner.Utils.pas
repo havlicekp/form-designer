@@ -25,7 +25,9 @@ public
 
 function GET_X_LPARAM(lParam: lParam): Integer;
 function GET_Y_LPARAM(lParam: lParam): Integer;
+function MAKEPOINT(lParam: lParam) : TPoint;
 function GetControlName(Parent: TWinControl; Cls: TClass): String;
+function GetMessageName(Msg: Cardinal) : String;
 procedure Log(msg: string); overload;
 procedure Log(const source, msg: string; const Rect: TRect); overload;
 procedure Log(const source: string; const message: string); overload;
@@ -105,6 +107,11 @@ begin
   Result := Format('%s%d', [Copy(Cls.ClassName, 2, Length(Cls.ClassName) - 1), CtrlCount]);
 end;
 
+function MAKEPOINT(lParam: lParam) : TPoint;
+begin
+  Result := TPoint.Create(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+end;
+
 function GET_X_LPARAM(lParam: lParam): Integer;
 begin
   Result := Smallint(LoWord(lParam));
@@ -113,6 +120,15 @@ end;
 function GET_Y_LPARAM(lParam: lParam): Integer;
 begin
   Result := Smallint(HiWord(lParam));
+end;
+
+function GetMessageName(Msg: Cardinal) : String;
+begin
+  case Msg of
+    WM_MOUSEMOVE: Result := 'WM_MOUSEMOVE';
+    WM_LBUTTONDOWN: Result := 'WM_LBUTTONDOWN';
+    WM_LBUTTONUP: Result := 'WM_LBUTTONUP';
+  end;
 end;
 
 
