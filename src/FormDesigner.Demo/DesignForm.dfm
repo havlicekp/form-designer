@@ -45,7 +45,6 @@ object frmDesignForm: TfrmDesignForm
     OnClick = CheckBox3Click
   end
   object fdDesigner: TFormDesigner
-    MarkSize = 12
     SnapToGrid = False
     Color = 15980210
     DragMode = dmImmediate
