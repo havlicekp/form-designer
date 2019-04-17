@@ -24,15 +24,17 @@ object frmDesignForm: TfrmDesignForm
     Height = 17
     Caption = 'DrawGrid'
     TabOrder = 0
+    Visible = False
     OnClick = CheckBox1Click
   end
   object CheckBox2: TCheckBox
-    Left = 128
+    Left = 137
     Top = 296
     Width = 97
     Height = 17
     Caption = 'SnapToGrid'
     TabOrder = 1
+    Visible = False
     OnClick = CheckBox2Click
   end
   object CheckBox3: TCheckBox
@@ -42,12 +44,10 @@ object frmDesignForm: TfrmDesignForm
     Height = 17
     Caption = 'ImmediateMode'
     TabOrder = 2
+    Visible = False
     OnClick = CheckBox3Click
   end
   object fdDesigner: TFormDesigner
-    SnapToGrid = False
-    Color = 15980210
-    DragMode = dmImmediate
     OnControlAdded = fdDesignerControlAdded
     OnControlSelected = fdDesignerEvent
     OnControlModified = fdDesignerEvent

@@ -499,7 +499,7 @@ begin
   // Process any waiting messages. This needs to be called
   // last in this proc to prevent premature processing of
   // WM_LBUTTONUP
-  Application.ProcessMessages;
+  //Application.ProcessMessages;
 end;
 
 procedure TFormDesigner.CancelSizeMove(WindowHandle: HWnd);
@@ -600,7 +600,7 @@ begin
   ClipCursor;
   FRect := FChild.BoundsRect;
   FOldRect := TRect.Empty;
-  Application.ProcessMessages;
+  //Application.ProcessMessages;
   DrawRect;
 end;
 
@@ -1025,7 +1025,8 @@ begin
     begin
       Mark.Visible := Value;
     end);
-  Application.ProcessMessages;
+  //Application.ProcessMessages;
+  FForm.Update;
 end;
 
 function TFormDesigner.GetChildRect: TRect;
