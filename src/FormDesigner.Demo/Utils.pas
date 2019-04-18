@@ -3,11 +3,11 @@ unit Utils;
 interface
 
 uses Classes, ExtCtrls, Controls, Windows, Vcl.Imaging.PngImage, Vcl.ComCtrls,
-  Vcl.Graphics;
+  Vcl.Graphics, System.SysUtils;
 
 function AddResourceToImageList(ImageList: TImageList; ResourceName: String): Integer;
 function AddControlToToolbar(ToolBar: TToolBar; ImageIndex: Integer; ControlName: String; ControlClass: TControlClass) : TToolButton;
-
+function FormatControlInfo(Control: TControl): String;
 
 implementation
 
@@ -52,5 +52,18 @@ begin
     Bitmap.Free;
   end;
 end;
+
+function FormatControlInfo(Control: TControl): String;
+begin
+  if Assigned(Control) then
+    Result :=
+      Format('%s: %s; Rect (%d, %d, %d, %d); Width: %d, Height: %d',
+      [Control.Name, Control.ClassName, Control.Left, Control.Top,
+      Control.BoundsRect.Right, Control.BoundsRect.Bottom, Control.Width,
+      Control.Height])
+  else
+    Result := 'Nothing Selected';
+end;
+
 
 end.

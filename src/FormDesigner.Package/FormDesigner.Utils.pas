@@ -10,6 +10,7 @@ type
 TEnumChildsProc = reference to procedure(Control: TControl);
 
 { TQueue }
+
 TQueue = class
 private
   FList: TList;
@@ -22,6 +23,14 @@ public
   destructor Destroy; override;
   property Count: Longint read GetCount;
  end;
+
+TRectHelper = record helper for TRect
+  function ClientToScreen(Window: TWinControl) : TRect;
+end;
+
+TWinControlHelder = class helper for TWinControl
+  procedure RemoveWindowStyle(Style: Integer);
+end;
 
 function GET_X_LPARAM(lParam: lParam): Integer;
 function GET_Y_LPARAM(lParam: lParam): Integer;
@@ -74,6 +83,25 @@ begin
   Result := FList.Count;
 end;
 
+// -----------------------------------------------------------------
+// TRectHelper
+// -----------------------------------------------------------------
+
+function TRectHelper.ClientToScreen(Window: TWinControl) : TRect;
+begin
+  Result.TopLeft := Window.ClientToScreen(TopLeft);
+  Result.BottomRight := Window.ClientToScreen(BottomRight);
+end;
+
+// -----------------------------------------------------------------
+// TWinControl Style
+// -----------------------------------------------------------------
+
+procedure TWinControlHelder.RemoveWindowStyle(Style: Integer);
+begin
+  SetWindowLong(Handle, GWL_STYLE, GetWindowLong(Handle, GWL_STYLE) and
+    not Style);
+end;
 
 // -----------------------------------------------------------------
 // Routines

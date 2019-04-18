@@ -3,61 +3,49 @@
 interface
 
 uses Classes, Controls, Graphics, Windows, Messages, Forms, SysUtils, StdCtrls,
-  System.Generics.Collections, Vcl.AppEvnts, FormDesigner.Interfaces, TypInfo,
-  FormDesigner.Utils, FormDesigner.Marks, ExtCtrls, System.DateUtils,
-  RTTI, System.Diagnostics, System.SyncObjs;
+  System.Generics.Collections, Vcl.AppEvnts, TypInfo, ExtCtrls,
+  System.DateUtils,
+  RTTI, System.SyncObjs, FormDesigner.Interfaces,
+  FormDesigner.Utils, FormDesigner.DragHandles;
 
 type
 
-  /// <summary>
   /// Conrols behavior of TFormDesigner during moving/sizing.
-  /// </summary
   TDragMode = (
-    /// <summary>
-    /// Changes to control'l position/size are visible immediatelly
+    /// Changes to control's position/size are visible immediatelly
     /// while dragging the mouse.
-    /// </summary>
     dmImmediate,
 
-    /// <summary>
-    /// Changes to controol's position/size are projected with a focus
+    /// Changes to control's position/size are projected with a focus
     /// rectangle and are applied after the mouse is released.
-    /// </summary>
     dmDeferred);
 
+  /// Callback for TFormDesigner.ForEachDragHandle
+  TDragHandleProc = reference to procedure(DragHandle: TDragHandle);
+
   TMessageHandler = procedure(Sender: TControl; X, Y: integer) of object;
-  TMarkProc = reference to procedure(Mark: TMark);
-  TMarkClass = class of TMark;
+  TDragHandleClass = class of TDragHandle;
   TFormDesignerException = class(Exception);
-  TWindowProc = function(Wnd: HWnd; msg: DWORD; wParam: wParam; lParam: lParam)
-    : LResult; stdcall;
+  TWindowProc = function(Wnd: HWnd; msg: Cardinal; wParam: wParam;
+    lParam: lParam): LResult; stdcall;
   TControlInfo = class;
   TRectModifiers = class;
 
-  /// <summary>
-  /// The TFormDesigner class.
-  /// Since not all Delphi controls have Windows handle (TLabel, TShape, ..)
-  /// SetCapture/ReleaseCaputre is not used for sizing/moving.
-  /// </summary>
   TFormDesigner = class(TComponent, IFormDesigner)
   private
     FParent: TWinControl;
     FChild: TControl;
-    FMarkSize: byte;
+    FDragHandleSize: byte;
     FRect: TRect;
-    FMarksVisible: Boolean;
-
-    /// <summary>
-    /// Where in the control was clicked in Client coords
-    /// </summary>
+    FDragHandlesVisible: Boolean;
     FClickOrigin: TPoint;
-
     FControls: TObjectList<TControlInfo>;
-    FColor: TColor;
+    FDragHandleColor: TColor;
     FState: TFormDesignerState;
     FApplicationEvents: TApplicationEvents;
     FForm: TForm;
-    FCurrentMark: TMark;
+    FShowHints: Boolean;
+    FCurrentDragHandle: TDragHandle;
     FDrawGrid: Boolean;
     FFormOnPaint: TNotifyEvent;
     FGridGap: integer;
@@ -65,8 +53,7 @@ type
     FToolTip: TBalloonHint;
     FDragMode: TDragMode;
     FLastMouseMove: TDateTime;
-    FTimer: TTimer;
-    FLastMousePos: TPoint;
+    FHintTimer: TTimer;
     FLastHintedControl: TControl;
     FOldRect: TRect;
     FControlToAdd: TControl;
@@ -81,42 +68,39 @@ type
     procedure ControlSelected;
     procedure ControlModified;
     procedure ControlAdded;
+    procedure SetShowHints(Value: Boolean);
     procedure UpdateChildProp(CtrlPropName, ShiftPropName: String;
       Value: integer; Shift: TShiftState);
-    function TryGetParent(HWnd: HWnd; pt: TPoint; var Control: TControl) : Boolean;
+    function TryGetParent(HWnd: HWnd; pt: TPoint;
+      var Control: TControl): Boolean;
     procedure CancelSizeMove(WindowHandle: HWnd);
     procedure SetChild(Value: TControl);
-    procedure SetMarkSize(Value: byte);
-    procedure SetMarksVisible(Value: Boolean);
-    procedure SetColor(Value: TColor);
+    procedure SetDragHandleSize(Value: byte);
+    procedure SetDragHandlesVisible(Value: Boolean);
+    procedure SetDragHandleColor(Value: TColor);
     procedure SetGridGap(Value: integer);
     procedure SetDrawGrid(Value: Boolean);
     procedure ClipCursor;
-    procedure UpdateMarks;
+    procedure UpdateDragHandles;
     procedure MessageReceivedHandler(var msg: tagMSG; var Handled: Boolean);
     procedure CallMessageHandler(msg: UINT; Control: TWinControl;
       var pt: TPoint; Handler: TMessageHandler);
     procedure PreProcessMessage(var msg: tagMSG; Handler: TMessageHandler);
     procedure FormPaintHandler(Sender: TObject);
-    procedure ForEachMark(Proc: TMarkProc);
-    procedure TimerHandler(Sender: TObject);
+    procedure ForEachDragHandle(Proc: TDragHandleProc);
+    procedure HintTimerHandler(Sender: TObject);
     procedure FormMouseEnterHandler(Sender: TObject);
-    procedure ShowHint(CursorPos: TPoint; Format: String;
-      const Args: array of const);
-    function MarkOfType(MarkClass: TMarkClass): TMark;
+    function DragHandleOfType(DragHandleClass: TDragHandleClass): TDragHandle;
     function IsOwnedControl(Control: TControl): Boolean;
     function AlignToGrid(Num: integer; Offset: integer = 0): integer;
-    procedure LButtonUpHandler(var msg: tagMSG; UpdateChildRect: Boolean);
-    /// <summary>
-    /// Handles mouse move. X, Y are in client coords of Sender's parent
-    /// </summary>
+    procedure LButtonUpHandler(var msg: tagMSG; ApplyChanges: Boolean);
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer);
     procedure LButtonDownHandler(Sender: TControl; X, Y: integer);
     procedure KeyDownHandler(var msg: tagMSG);
-    procedure FocusControl(Control: TControl);
     procedure DrawRect(OnlyCleanUp: Boolean = False);
-    procedure StartSizing(Mark: TMark; MousePos: TPoint);
-    property MarksVisible: Boolean read FMarksVisible write SetMarksVisible;
+    procedure StartSizing(DragHandle: TDragHandle; MousePos: TPoint);
+    property DragHandlesVisible: Boolean read FDragHandlesVisible
+      write SetDragHandlesVisible;
     property Child: TControl read FChild write SetChild;
     procedure SetupControlToAdd(var pt: TPoint; Control: TControl);
   public
@@ -129,12 +113,16 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
   published
-    property MarkSize: byte read FMarkSize write SetMarkSize default 8;
+    property DragHandleSize: byte read FDragHandleSize write SetDragHandleSize
+      default 8;
     property SnapToGrid: Boolean read FSnapToGrid write FSnapToGrid
       default True;
-    property Color: TColor read FColor write SetColor default clBlack;
+    property DragHandleColor: TColor read FDragHandleColor
+      write SetDragHandleColor default TColor(15980210); // RGB(178, 214, 243);
     property DrawGrid: Boolean read FDrawGrid write SetDrawGrid default True;
     property GridGap: integer read FGridGap write SetGridGap default 8;
+    property ShowHints: Boolean read FShowHints write SetShowHints
+      default False;
     property DragMode: TDragMode read FDragMode write FDragMode
       default dmDeferred;
     property OnControlAdded: TNotifyEvent read FOnControlAdded
@@ -145,49 +133,38 @@ type
       write FOnControlModified;
   end;
 
-  /// <summary>
   /// Holds information about a control managed by TFormDesigner
-  /// </summary>
   TControlInfo = class
   public
-    Sizer: TFormDesigner;
+    FormDesigner: TFormDesigner;
     Control: TControl;
 
-    /// <summary>
     /// Used to replace Window procedure for Delphi controls
-    /// </summary>
     PrevWndMethod: TWndMethod;
 
-    /// <summary>
     /// Used to replace Window procedure for controls not managed by Delphi
     /// (like Edit inside a ComboBox)
-    /// </summary>
     PrevWindowProc: TWindowProc;
+
     procedure ControlWindowProc(var msg: TMessage);
   end;
 
-  /// <summary>
   /// There are slight differences among TControl.BoundsRect
   /// For TButton, BoundsRect includes 1px gap around the control, which accomodes focus rectangle
   /// For TComboBox or TEdit, there is no such gap so the focus rect has to be expanded
-  /// These differences are handled by TRectModifier's</summary>
-  /// </summary>
+  /// These differences are handled by TRectModifier
   TRectModifier = class abstract
   public
     function Modify(var Rect: TRect): TRect; virtual; abstract;
   end;
 
-  /// <summary>
   /// Base class for TRectModifier. Its <see cref="Modify"> method returns
   /// TRect without any changes
-  /// </summary>
   TRectModifierBase = class(TRectModifier)
     function Modify(var Rect: TRect): TRect; override;
   end;
 
-  /// <summary>
   /// Inflates TRect by a specified number of pixels
-  /// </summary>
   TInflatingRectModifier = class(TRectModifierBase)
   private
     FInflateBy: integer;
@@ -196,9 +173,6 @@ type
     function Modify(var Rect: TRect): TRect; override;
   end;
 
-  /// <summary>
-  /// Holds collection of TRectModifier.
-  /// </summary>
   TRectModifiers = class
   private
     FRectModifiers: TObjectDictionary<TControlClass, TRectModifier>;
@@ -212,18 +186,22 @@ type
 procedure Register;
 
 const
-  MarkClasses: array [0 .. 7] of TMarkClass = (TUpMark, TDownMark, TLeftMark,
-    TRightMark, TUpLeftMark, TUpRightMark, TDownLeftMark, TDownRightMark);
+  DragHandleClasses: array [0 .. 7] of TDragHandleClass = (TUpDragHandle,
+    TDownDragHandle, TLeftDragHandle, TRightDragHandle, TUpLeftDragHandle,
+    TUpRightDragHandle, TDownLeftDragHandle, TDownRightDragHandle);
 
 implementation
 
 var
   LockMouse: TCriticalSection;
 
-  // ----------------------------------------------------------
-  // TWindowProcedury
-  // ----------------------------------------------------------
+  // -----------------------------------------------------------------
+  // Window Procedures
+  // -----------------------------------------------------------------
 
+  // Filters Window messages and skips those related to keyboard or mouse
+  // interaction. Aim is to hide any control interaction while they are managed by
+  // TFormDesigner
 function IsAllowedMessage(const msg: Cardinal): Boolean;
 begin
   Result := (msg <> WM_SETFOCUS) and (msg <> WM_LBUTTONDOWN) and
@@ -231,23 +209,17 @@ begin
     (msg <> WM_MOUSEMOVE);
 end;
 
-// ----------------------------------------------------------
-// Tato okenni procedura je prirazena do
-// WndProc prvku predanem do TFormDesigner.AddControl
-//
+// Window procedure for controls managed by Delphi
 procedure TControlInfo.ControlWindowProc(var msg: TMessage);
 begin
   if IsAllowedMessage(msg.msg) then
     PrevWndMethod(msg);
 end;
 
-// ----------------------------------------------------------
-// Spec okenni procedura jen pro Edit prvek TComboBoxu
-// (protoze nahradit jeho ok. proc. jde jen pres
-// SetWindowLong, ktera neprijma metody - cili
-// NewProcedure TWindowProcedure)
-//
-function ComboEditWindowProcedure(Wnd: HWnd; msg: DWORD; wParam: wParam;
+// Windows procedure for controls not managed by Delphi, like EDIT inside a
+// TComboBox. It is set by using SetWindowLong. In this case instance
+// methods can't be used.
+function ComboEditWindowProcedure(Wnd: HWnd; msg: Cardinal; wParam: wParam;
   lParam: lParam): LResult; stdcall;
 var
   ControlInfo: TControlInfo;
@@ -257,17 +229,20 @@ begin
     ControlInfo := TControlInfo(GetProp(Wnd, 'TControlInfo'));
     Result := CallWindowProc(Addr(ControlInfo.PrevWindowProc), Wnd, msg,
       wParam, lParam);
-  end;
+  end
+  else
+    Result := 0;
 end;
 
-// ----------------------------------------------------------
+
+// -----------------------------------------------------------------
 // TFormDesigner
-// ----------------------------------------------------------
+// -----------------------------------------------------------------
 
 constructor TFormDesigner.Create(AOwner: TComponent);
 var
-  MarkClass: TMarkClass;
-  Mark: TMark;
+  DragHandleClass: TDragHandleClass;
+  DragHandle: TDragHandle;
 begin
   inherited Create(AOwner);
   if AOwner is TForm then
@@ -275,33 +250,36 @@ begin
   else
     FForm := TForm(GetParentForm(TControl(AOwner)));
 
+  FForm.RemoveWindowStyle(WS_CLIPCHILDREN);
   FRectModifiers := TRectModifiers.Create;
   FControls := TObjectList<TControlInfo>.Create;
 
   FForm.OnMouseEnter := FormMouseEnterHandler;
-  FColor := RGB(178, 214, 243);
-  FMarkSize := 8;
-  DrawGrid := True;
+  FDragHandleColor := RGB(178, 214, 243);
+  FDragHandleSize := 8;
   FGridGap := 8;
   FSnapToGrid := True;
   FDragMode := dmDeferred;
+  DrawGrid := True;
 
-  for MarkClass in MarkClasses do
+  for DragHandleClass in DragHandleClasses do
   begin
-    Mark := MarkClass.Create(Self);
-    Mark.SetProps(FMarkSize, FColor, Self);
-    InsertComponent(Mark);
+    DragHandle := DragHandleClass.Create(Self);
+    DragHandle.SetProps(FDragHandleSize, FDragHandleColor, Self);
+    InsertComponent(DragHandle);
   end;
 
   if not(csDesigning in ComponentState) then
   begin
     FApplicationEvents := TApplicationEvents.Create(nil);
     FApplicationEvents.OnMessage := MessageReceivedHandler;
-
-    FTimer := TTimer.Create(nil);
-    FTimer.Interval := 200;
-    FTimer.Enabled := True;
-    FTimer.OnTimer := TimerHandler;
+    FHintTimer := TTimer.Create(nil);
+    with FHintTimer do
+    begin
+      Interval := 200;
+      Enabled := FShowHints;
+      OnTimer := HintTimerHandler;
+    end;
   end;
 
   FToolTip := TBalloonHint.Create(nil);
@@ -314,7 +292,7 @@ destructor TFormDesigner.Destroy;
 begin
   FApplicationEvents.Free;
   FRectModifiers.Free;
-  FTimer.Free;
+  FHintTimer.Free;
   FToolTip.Free;
   FControls.Free;
   inherited Destroy;
@@ -324,7 +302,6 @@ procedure TFormDesigner.SetupControlToAdd(var pt: TPoint; Control: TControl);
 var
   Parent: TWinControl;
 begin
-  Log('Designer', 'SetupControToAdd');
   FSizingOrigin := TPoint.Create(pt.X, pt.Y);
   if (csAcceptsControls in Control.ControlStyle) then
     Parent := TWinControl(Control)
@@ -343,54 +320,44 @@ begin
     Width := 0;
     Height := 0;
   end;
-  Log('Designer', 'FControlToAdd', FControlToAdd.BoundsRect);
   FControlToAdd.Parent := Parent;
   Child := FControlToAdd;
 end;
 
 procedure TFormDesigner.ClipCursor;
 var
-  Handle: THandle;
+  Rect: TRect;
 begin
-  if FParent is TForm then
-    Handle := FParent.Handle
-  else
-    Handle := FParent.Parent.Handle;
-  GetClientRect(Handle, FRect);
-  ClientToScreen(Handle, TPoint(FRect.TopLeft));
-  ClientToScreen(Handle, TPoint(FRect.BottomRight));
-  Windows.ClipCursor(@FRect);
-  FRect := FChild.BoundsRect;
-  // FRect.Inflate(1, 1, 1, 1);
+  Rect := FParent.ClientRect.ClientToScreen(FParent);
+  Windows.ClipCursor(@Rect);
 end;
 
+// ApplyChanges instructs whether changes to FChild's size/position should
+// be applied on the button relase. When False, FChild's size/position
+// is not changed.
 procedure TFormDesigner.LButtonUpHandler(var msg: tagMSG;
-  UpdateChildRect: Boolean);
+  ApplyChanges: Boolean);
 var
   MousePos: TPoint;
-  InvalidRect: TRect;
-  DC: HDC;
 begin
   if (FState <> ssReady) and IsMessageForWindow(msg.HWnd, FForm.Handle) then
   begin
-    Log('Designer', 'OnLButtonUpHandler: State: %s',
-      [TRttiEnumerationType.GetName(FState)]);
-
     FState := ssReady;
-    Windows.ClipCursor(nil);
-    FCurrentMark := nil;
-
+    FCurrentDragHandle := nil;
     FToolTip.HideHint;
+    Windows.ClipCursor(nil);
 
     if Assigned(FChild) then
     begin
+      // Clean up the last focus rect drawn
       DrawRect(True);
-      if UpdateChildRect then
+      // Should we apply changes to size/position?
+      if ApplyChanges then
       begin
         FChild.BoundsRect := FRect;
-        UpdateMarks;
+        UpdateDragHandles;
       end;
-      MarksVisible := True;
+      DragHandlesVisible := True;
     end;
 
     if Assigned(FControlToAdd) then
@@ -414,7 +381,7 @@ begin
       AddControl(FControlToAdd);
       ControlAdded;
       FControlToAdd := nil;
-      UpdateMarks;
+      UpdateDragHandles;
     end;
     ControlModified;
     LockMouse.Release;
@@ -467,39 +434,26 @@ end;
 
 procedure TFormDesigner.LButtonDownHandler(Sender: TControl; X, Y: integer);
 begin
-  LockMouse.Acquire;
-
-  FButtonDownOrigin := TPoint.Create(X, Y);
-
   Log('Designer', 'OnLButtonDownHandler X: %d, Y: %d', [X, Y]);
-  Log('Designer', 'FRect', FRect);
-
+  LockMouse.Acquire;
+  FButtonDownOrigin := TPoint.Create(X, Y);
   FToolTip.HideHint;
+  DragHandlesVisible := False;
 
-  if MarksVisible then
-    MarksVisible := False;
-
-  if Sender is TForm then
+  if not(Sender is TForm) then
+  begin
+    if Child <> Sender then
+      Child := TControl(Sender);
+    FClickOrigin.X := X - FChild.Left;
+    FClickOrigin.Y := Y - FChild.Top;
+    FState := ssMoving;
+    DrawRect;
+    ClipCursor;
+  end
+  else
   begin
     Child := nil;
-    Exit;
   end;
-
-  if Child <> Sender then
-    Child := TControl(Sender);
-
-  DrawRect;
-
-  FClickOrigin.X := X - FChild.Left;
-  FClickOrigin.Y := Y - FChild.Top;
-
-  FState := ssMoving;
-  ClipCursor;
-
-  // Process any waiting messages. This needs to be called
-  // last in this proc to prevent premature processing of
-  // WM_LBUTTONUP
-  //Application.ProcessMessages;
 end;
 
 procedure TFormDesigner.CancelSizeMove(WindowHandle: HWnd);
@@ -528,7 +482,7 @@ begin
     SetOrdProp(FChild, ShiftPropName, PropValue);
   end;
   FRect := FChild.BoundsRect;
-  UpdateMarks;
+  UpdateDragHandles;
   ControlModified;
 end;
 
@@ -574,7 +528,7 @@ begin
                 else
                 begin
                   Child := nil;
-                  MarksVisible := False;
+                  DragHandlesVisible := False;
                 end;
               end;
             end;
@@ -588,19 +542,17 @@ begin
   end;
 end;
 
-procedure TFormDesigner.StartSizing(Mark: TMark; MousePos: TPoint);
+procedure TFormDesigner.StartSizing(DragHandle: TDragHandle; MousePos: TPoint);
 begin
-  Log('StartSizing', 'Mark: %s; Before Acquire', [Mark.ClassName]);
+  Log('Sizer', 'StartSizing');
   LockMouse.Acquire;
-    Log('StartSizing', 'Mark: %s; After Acquire', [Mark.ClassName]);
-  FCurrentMark := Mark;
-  FCurrentMark.SetSizingOrigin(MousePos.X, MousePos.Y);
+  FCurrentDragHandle := DragHandle;
+  FCurrentDragHandle.SetSizingOrigin(MousePos.X, MousePos.Y);
   FState := ssSizing;
-  MarksVisible := False;
+  DragHandlesVisible := False;
   ClipCursor;
   FRect := FChild.BoundsRect;
   FOldRect := TRect.Empty;
-  //Application.ProcessMessages;
   DrawRect;
 end;
 
@@ -621,37 +573,28 @@ end;
 procedure TFormDesigner.AddControl(AControl: TControl);
 var
   ControlInfo: TControlInfo;
-  editWnd: HWnd;
+  EditWnd: HWnd;
 begin
   ControlInfo := TControlInfo.Create;
   with ControlInfo do
   begin
     Control := AControl;
-    Sizer := Self;
+    FormDesigner := Self;
     PrevWndMethod := Control.WindowProc;
     Control.WindowProc := ControlWindowProc;
     if (AControl is TComboBox) then
     begin
-      editWnd := GetWindow(TComboBox(Control).Handle, GW_CHILD);
-      SetClassLong(editWnd, GCL_HCURSOR, LoadCursor(0, IDC_ARROW));
-      SetProp(editWnd, 'TControlInfo', DWORD(ControlInfo));
-      @PrevWindowProc := Pointer(SetWindowLong(editWnd, GWL_WNDPROC,
+      EditWnd := GetWindow(TComboBox(Control).Handle, GW_CHILD);
+      SetClassLong(EditWnd, GCL_HCURSOR, LoadCursor(0, IDC_ARROW));
+      SetProp(EditWnd, 'TControlInfo', DWORD(ControlInfo));
+      @PrevWindowProc := Pointer(SetWindowLong(EditWnd, GWL_WNDPROC,
         Longint(@ComboEditWindowProcedure)));
     end;
   end;
+  if AControl is TWinControl then
+    TWinControl(AControl).RemoveWindowStyle(WS_CLIPCHILDREN);
   FControls.Add(ControlInfo);
   AControl.Cursor := crArrow;
-end;
-
-procedure TFormDesigner.FocusControl(Control: TControl);
-begin
-  if FChild <> Control then
-  begin
-    Child := Control;
-  end;
-
-  if not MarksVisible then
-    MarksVisible := True;
 end;
 
 procedure TFormDesigner.RemoveControl(Control: TControl);
@@ -671,30 +614,11 @@ begin
   raise TFormDesignerException.Create('Unable to remove a control');
 end;
 
-procedure TFormDesigner.ShowHint(CursorPos: TPoint; Format: String;
-  const Args: array of const);
-begin
-  CursorPos.Offset(28, 28);
-  FToolTip.Description := SysUtils.Format(Format, Args);
-  // FToolTip.ShowHint(CursorPos);
-  // Log('Designer', 'Showing hint ... ');
-end;
-
 procedure TFormDesigner.MouseMoveHandler(Sender: TControl; X, Y: integer);
-var
-  CursorPos: TPoint;
 begin
-
-  Log('Designer',
-    'OnMouseMoveHandler: X: %d, Y: %d, FButtonDownOrigin.X: %d, FButtonDownOrigin.kY: %d',
-    [X, Y, FButtonDownOrigin.X, FButtonDownOrigin.Y]);
-
-  CursorPos := Mouse.CursorPos;
-  if (PointsEqual(CursorPos, FLastMousePos)) or PointsEqual(FButtonDownOrigin,
-    TPoint.Create(X, Y)) then
+  Log('Designer', 'MouseMoveHandler: X: %d, Y: %d', [X, Y]);
+  if PointsEqual(FButtonDownOrigin, TPoint.Create(X, Y)) then
     Exit;
-
-  FLastMousePos := CursorPos;
 
   FLastMouseMove := Now;
   DrawRect;
@@ -712,50 +636,50 @@ begin
   FRect.Bottom := FRect.Top + FChild.Height;
   FRect.Right := FRect.Left + FChild.Width;
 
-  if (FState = ssMoving) then
+  if FState = ssMoving then
   begin
     if FDragMode = dmImmediate then
       FChild.SetBounds(FRect.Left, FRect.Top, FRect.Width, FRect.Height)
     else
       DrawRect;
-    // if FState = ssMoving then
-    // ShowHint(CursorPos, '%d, %d', [FChild.Left, FChild.Top]);
   end;
 end;
 
-procedure TFormDesigner.TimerHandler(Sender: TObject);
+procedure TFormDesigner.HintTimerHandler(Sender: TObject);
 var
   ms: Int64;
   Control, Child: TControl;
   CursorPos: TPoint;
 begin
-  if (FState = ssSizing) or (FState = ssMoving) then
-    Exit;
-  ms := System.DateUtils.MilliSecondsBetween(Now, FLastMouseMove);
-  if ms > 50 then
+  if FState = ssReady then
   begin
-    CursorPos := Mouse.CursorPos;
-    Control := Controls.FindVCLWindow(CursorPos);
-    if (Control <> nil) and not(Control is TMark) then
+    ms := System.DateUtils.MilliSecondsBetween(Now, FLastMouseMove);
+    if ms > 50 then
     begin
-      Child := TWinControl(Control)
-        .ControlAtPos(Control.ScreenToClient(CursorPos), True);
-      if Assigned(Child) then
-        Control := Child;
-      if (Control = FLastHintedControl) or (Control is TForm) or
-        (Control is TMark) then
-        Exit;
-      FLastHintedControl := Control;
-      FToolTip.Description :=
-        Format('%s: %s%sBounds: %d, %d, %d, %d; Size: %d, %d',
-        [Control.Name, Control.ClassName, sLineBreak, Control.Left, Control.Top,
-        Control.BoundsRect.Right, Control.BoundsRect.Bottom, Control.Width,
-        Control.Height, sLineBreak]);
-      CursorPos.Offset(34, 24);
-      // FToolTip.ShowHint(CursorPos);
-    end
-    else
-      FToolTip.HideHint;
+      CursorPos := Mouse.CursorPos;
+      Control := Controls.FindVCLWindow(CursorPos);
+      if (Control <> nil) and IsOwnedControl(Control) then
+      begin
+        Child := TWinControl(Control)
+          .ControlAtPos(Control.ScreenToClient(CursorPos), True);
+        // Is there a pure Delphi control? (TLabel, TShape, ... )
+        if Assigned(Child) then
+          Control := Child;
+        if (Control <> FLastHintedControl) then
+        begin
+          FLastHintedControl := Control;
+          FToolTip.Description :=
+            Format('%s: %s%sBounds: %d, %d, %d, %d; Size: %d, %d',
+            [Control.Name, Control.ClassName, sLineBreak, Control.Left,
+            Control.Top, Control.BoundsRect.Right, Control.BoundsRect.Bottom,
+            Control.Width, Control.Height, sLineBreak]);
+          CursorPos.Offset(34, 24);
+          FToolTip.ShowHint(CursorPos);
+        end;
+      end
+      else
+        FToolTip.HideHint;
+    end;
   end;
 end;
 
@@ -781,43 +705,35 @@ begin
 end;
 
 procedure TFormDesigner.SetChild(Value: TControl);
-var
-  Wnd: HWnd;
 begin
   FOldRect := TRect.Empty;
   FChild := Value;
-  if not(FChild = nil) then
+  if Assigned(FChild) then
   begin
-    if not(FChild is TForm) then
-      FParent := FChild.Parent
-    else
-      FParent := TWinControl(FChild);
-    Wnd := FParent.Handle;
-    SetWindowLong(Wnd, GWL_STYLE, GetWindowLong(Wnd, GWL_STYLE) and
-      not WS_CLIPCHILDREN);
-    FChild.BringToFront;
-    // MarksVisible := False;
-    ForEachMark(
-      procedure(Mark: TMark)
-      begin
-        Mark.Parent := FParent;
-        Mark.BringToFront;
-        Mark.Update(FChild);
-      end);
-    // MarksVisible := True;
+    FParent := FChild.Parent;
     FRect := Child.BoundsRect;
+    FChild.BringToFront;
+    ForEachDragHandle(
+      procedure(DragHandle: TDragHandle)
+      begin
+        DragHandle.Parent := FParent;
+        DragHandle.BringToFront;
+        DragHandle.UpdatePosition(FChild);
+      end);
   end
   else
+  begin
     FRect := TRect.Empty;
+  end;
   ControlSelected;
 end;
 
-procedure TFormDesigner.UpdateMarks();
+procedure TFormDesigner.UpdateDragHandles();
 begin
-  ForEachMark(
-    procedure(Mark: TMark)
+  ForEachDragHandle(
+    procedure(DragHandle: TDragHandle)
     begin
-      Mark.Update(FChild);
+      DragHandle.UpdatePosition(FChild);
     end);
 end;
 
@@ -888,7 +804,7 @@ begin
     if Assigned(FControlToAdd) and (FState = ssReady) then
     begin
       SetupControlToAdd(pt, Control);
-      StartSizing(MarkOfType(TDownRightMark), TPoint.Zero);
+      StartSizing(DragHandleOfType(TDownRightDragHandle), TPoint.Zero);
     end
     else if Assigned(Control) then
     begin
@@ -897,7 +813,7 @@ begin
     else
     begin
       // No Delphi control found, is it EDIT in a Combobox?
-      if TryGetParent(msg.hwnd, pt, Control) then
+      if TryGetParent(msg.HWnd, pt, Control) then
         CallMessageHandler(msg.message, TWinControl(Control), pt, Handler);
     end;
   end;
@@ -913,29 +829,29 @@ begin
       begin
         if FState = ssMoving then
         begin
-          Log('Designer', 'WM_MOUSEMOVE (%d)', [msg.hwnd]);
+          Log('Designer', 'WM_MOUSEMOVE (%d)', [msg.HWnd]);
           PreProcessMessage(msg, MouseMoveHandler)
         end
         else if FState = ssSizing then
         begin
-          Log('Designer', 'WM_MOUSEMOVE (%d)', [msg.hwnd]);
-          PreProcessMessage(msg, FCurrentMark.MouseMoveHandler);
+          Log('Designer', 'WM_MOUSEMOVE (%d)', [msg.HWnd]);
+          PreProcessMessage(msg, FCurrentDragHandle.MouseMoveHandler);
         end;
       end;
 
     WM_LBUTTONDOWN:
       begin
-        Log('Designer', 'WM_LBUTTONDOWN (%d)', [msg.hwnd]);
+        Log('Designer', 'WM_LBUTTONDOWN (%d)', [msg.HWnd]);
         Control := FindControl(msg.HWnd);
-        if (Control is TMark) then
-          StartSizing(TMark(Control), MAKEPOINT(msg.lParam))
+        if (Control is TDragHandle) then
+          StartSizing(TDragHandle(Control), MAKEPOINT(msg.lParam))
         else
           PreProcessMessage(msg, LButtonDownHandler);
       end;
 
     WM_LBUTTONUP:
       begin
-        Log('Designer', 'WM_LBUTTONUP (%d)', [msg.hwnd]);
+        Log('Designer', 'WM_LBUTTONUP (%d)', [msg.HWnd]);
         LButtonUpHandler(msg, True);
       end;
 
@@ -945,7 +861,8 @@ begin
   end;
 end;
 
-function TFormDesigner.TryGetParent(HWnd: HWnd; pt: TPoint; var Control: TControl) : Boolean;
+function TFormDesigner.TryGetParent(HWnd: HWnd; pt: TPoint;
+var Control: TControl): Boolean;
 var
   ClsName: array [0 .. 5] of char;
 begin
@@ -962,20 +879,19 @@ begin
       pt := Control.ScreenToClient(pt);
       Log('Designer', 'EDIT event: Control.Name: %s, pt.X: %d, pt.Y: %d',
         [Control.Name, pt.X, pt.Y]);
-      //CallMessageHandler(msg.message, TWinControl(Control), pt, Handler);
+      // CallMessageHandler(msg.message, TWinControl(Control), pt, Handler);
       Result := True;
     end;
   end;
 end;
 
-
-procedure TFormDesigner.SetColor(Value: TColor);
+procedure TFormDesigner.SetDragHandleColor(Value: TColor);
 begin
-  FColor := Value;
-  ForEachMark(
-    procedure(Mark: TMark)
+  FDragHandleColor := Value;
+  ForEachDragHandle(
+    procedure(DragHandle: TDragHandle)
     begin
-      Mark.SetProps(FMarkSize, FColor, Self);
+      DragHandle.SetProps(FDragHandleSize, FDragHandleColor, Self);
     end);
 end;
 
@@ -1004,28 +920,28 @@ begin
   end;
 end;
 
-procedure TFormDesigner.SetMarkSize(Value: byte);
+procedure TFormDesigner.SetDragHandleSize(Value: byte);
 begin
-  FMarkSize := Value;
-  ForEachMark(
-    procedure(Mark: TMark)
+  FDragHandleSize := Value;
+  ForEachDragHandle(
+    procedure(DragHandle: TDragHandle)
     begin
-      Mark.Width := Value;
-      Mark.Height := Value;
+      DragHandle.Width := Value;
+      DragHandle.Height := Value;
     end);
 end;
 
-procedure TFormDesigner.SetMarksVisible(Value: Boolean);
+procedure TFormDesigner.SetDragHandlesVisible(Value: Boolean);
 begin
-  Log('Designer', 'MarksVisible: From: %s to %s', [BoolToStr(FMarksVisible),
-    BoolToStr(Value)]);
-  FMarksVisible := Value;
-  ForEachMark(
-    procedure(Mark: TMark)
+  Log('Designer', 'DragHandlesVisible: From: %s to %s',
+    [BoolToStr(FDragHandlesVisible), BoolToStr(Value)]);
+  FDragHandlesVisible := Value;
+  ForEachDragHandle(
+    procedure(DragHandle: TDragHandle)
     begin
-      Mark.Visible := Value;
+      DragHandle.Visible := Value;
     end);
-  //Application.ProcessMessages;
+  // Application.ProcessMessages;
   FForm.Update;
 end;
 
@@ -1039,27 +955,33 @@ begin
   Result := FRect;
 end;
 
-function TFormDesigner.MarkOfType(MarkClass: TMarkClass): TMark;
+function TFormDesigner.DragHandleOfType(DragHandleClass: TDragHandleClass)
+  : TDragHandle;
 var
   i: integer;
-  Mark: TMark;
+  DragHandle: TDragHandle;
 begin
   for i := 0 to ComponentCount - 1 do
   begin
-    Mark := TMark(Components[i]);
-    if Mark.ClassNameIs(MarkClass.ClassName) then
+    DragHandle := TDragHandle(Components[i]);
+    if DragHandle.ClassNameIs(DragHandleClass.ClassName) then
     begin
-      Result := Mark;
+      Result := DragHandle;
       Exit;
     end;
   end;
-  raise TFormDesignerException.Create('Unknow Mark Type');
+  raise TFormDesignerException.Create('Unknow DragHandle Type');
 end;
 
 procedure TFormDesigner.SetGridGap(Value: integer);
 begin
   FGridGap := Value;
   FForm.Refresh;
+end;
+
+procedure TFormDesigner.SetShowHints(Value: Boolean);
+begin
+  FHintTimer.Enabled := Value;
 end;
 
 function TFormDesigner.IsOwnedControl(Control: TControl): Boolean;
@@ -1075,12 +997,12 @@ begin
     end;
 end;
 
-procedure TFormDesigner.ForEachMark(Proc: TMarkProc);
+procedure TFormDesigner.ForEachDragHandle(Proc: TDragHandleProc);
 var
   i: integer;
 begin
   for i := 0 to ComponentCount - 1 do
-    Proc(TMark(Components[i]));
+    Proc(TDragHandle(Components[i]));
 end;
 
 procedure TFormDesigner.ControlModified;
@@ -1101,7 +1023,10 @@ begin
     FOnControlAdded(FChild);
 end;
 
-{ TInflatingRectModifier }
+
+// -----------------------------------------------------------------
+// TInflatingRectModifier
+// -----------------------------------------------------------------
 
 constructor TInflatingRectModifier.Create(InflateBy: integer);
 begin
@@ -1117,14 +1042,20 @@ begin
   Result := InflatedRect;
 end;
 
-{ TRectModifierBase }
+
+// -----------------------------------------------------------------
+// TRectModifierBase
+// -----------------------------------------------------------------
 
 function TRectModifierBase.Modify(var Rect: TRect): TRect;
 begin
   Result := Rect;
 end;
 
-{ TRectModifiers }
+
+// -----------------------------------------------------------------
+// TRectModifiers
+// -----------------------------------------------------------------
 
 function TRectModifiers.GetForControl(Control: TControl): TRectModifier;
 var
@@ -1159,7 +1090,10 @@ end;
 
 destructor TRectModifiers.Destroy;
 begin
+  // No need to free FRectModifiers entries since
+  // it has set dsOwnValues
   FDefaultRectModifier.Free;
+  inherited Destroy;
 end;
 
 procedure Register;

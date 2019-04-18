@@ -5,7 +5,7 @@
         <ProjectVersion>18.6</ProjectVersion>
         <FrameworkType>VCL</FrameworkType>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Release</Config>
+        <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <TargetedPlatforms>1</TargetedPlatforms>
         <AppType>Package</AppType>
@@ -82,20 +82,12 @@
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="vcl.dcp"/>
         <DCCReference Include="FormDesigner.Interfaces.pas"/>
-        <DCCReference Include="FormDesigner.Marks.pas"/>
+        <DCCReference Include="FormDesigner.DragHandles.pas"/>
         <DCCReference Include="FormDesigner.Designer.pas"/>
         <DCCReference Include="FormDesigner.Utils.pas"/>
-        <RcItem Include="TFORMDESIGNER32.PNG">
-            <ResourceType>RCDATA</ResourceType>
-            <ResourceId>TFORMDESIGNER32_PNG</ResourceId>
-        </RcItem>
         <RcItem Include="TFORMDESIGNER.PNG">
             <ResourceType>RCDATA</ResourceType>
             <ResourceId>TFORMDESIGNER_PNG</ResourceId>
-        </RcItem>
-        <RcItem Include="TFORMDESIGNER16.PNG">
-            <ResourceType>RCDATA</ResourceType>
-            <ResourceId>TFORMDESIGNER16_PNG</ResourceId>
         </RcItem>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

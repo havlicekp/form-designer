@@ -1,4 +1,4 @@
-unit FormDesigner.Marks;
+unit FormDesigner.DragHandles;
 
 interface
 
@@ -7,80 +7,72 @@ uses Classes, Controls, Graphics, Windows, Messages, Forms, SysUtils, StdCtrls,
 
 type
 
-  { TMARK }
-  TMark = class(TCustomControl)
+  /// Base class for drag handles
+  TDragHandle = class(TCustomControl)
   private
     FClickOrigin: TPoint;
     FFormDesigner: IFormDesigner;
   public
     procedure SetSizingOrigin(const X, Y: Integer);
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); virtual; abstract;
-    procedure Update(Control: TControl); virtual; abstract;
+    procedure UpdatePosition(Control: TControl); virtual; abstract;
     procedure SetProps(ASize: byte; AColor: TColor; AFormDesigner: IFormDesigner);
     procedure Paint; override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  { TUPMARK }
-  TUpMark = class(TMark)
+  TUpDragHandle = class(TDragHandle)
   public
-    procedure Update(Control: TControl); override;
+    procedure UpdatePosition(Control: TControl); override;
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  { TDOWNMARK }
-  TDownMark = class(TMark)
+  TDownDragHandle = class(TDragHandle)
   public
-    procedure Update(Control: TControl); override;
+    procedure UpdatePosition(Control: TControl); override;
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  { TLEFTMARK }
-  TLeftMark = class(TMark)
+  TLeftDragHandle = class(TDragHandle)
   public
-    procedure Update(Control: TControl); override;
+    procedure UpdatePosition(Control: TControl); override;
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  { TRIGHTMARK }
-  TRightMark = class(TMark)
+  TRightDragHandle = class(TDragHandle)
   public
-    procedure Update(Control: TControl); override;
+    procedure UpdatePosition(Control: TControl); override;
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  { TUPLEFTMARK }
-  TUpLeftMark = class(TMark)
+  TUpLeftDragHandle = class(TDragHandle)
   public
-    procedure Update(Control: TControl); override;
+    procedure UpdatePosition(Control: TControl); override;
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  { TUPRIGHTMARK }
-  TUpRightMark = class(TMark)
+  TUpRightDragHandle = class(TDragHandle)
   public
-    procedure Update(Control: TControl); override;
+    procedure UpdatePosition(Control: TControl); override;
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  { TDOWNLEFTMARK }
-  TDownLeftMark = class(TMark)
+  TDownLeftDragHandle = class(TDragHandle)
   public
-    procedure Update(Control: TControl); override;
+    procedure UpdatePosition(Control: TControl); override;
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  { TDOWNRIGHTMARK }
-  TDownRightMark = class(TMark)
+  TDownRightDragHandle = class(TDragHandle)
   public
-    procedure Update(Control: TControl); override;
+    procedure UpdatePosition(Control: TControl); override;
     procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
@@ -88,17 +80,17 @@ type
 implementation
 
 // ----------------------------------------------------------
-// TMarks
+// TDragHandles
 // ----------------------------------------------------------
 
-constructor TMark.Create;
+constructor TDragHandle.Create;
 begin
   inherited Create(AOwner);
   Visible := False;
   FClickOrigin := TPoint.Zero;
 end;
 
-procedure TMark.SetSizingOrigin(const X, Y: Integer);
+procedure TDragHandle.SetSizingOrigin(const X, Y: Integer);
 var
   HalfWidth: Integer;
 begin
@@ -120,106 +112,106 @@ begin
       FClickOrigin.Y := HalfWidth - Y;
   end;
 
-  Log('TMark', 'X: %d, Y: %d, FClickOrigin.X: %d, FClickOrigin.Y: %d', [X, Y, FClickOrigin.X, FClickOrigin.Y]);
+  Log('TDragHandle', 'X: %d, Y: %d, FClickOrigin.X: %d, FClickOrigin.Y: %d', [X, Y, FClickOrigin.X, FClickOrigin.Y]);
 end;
 
-constructor TUpMark.Create;
+constructor TUpDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNS;
 end;
 
-constructor TDownMark.Create;
+constructor TDownDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNS;
 end;
 
-constructor TLeftMark.Create;
+constructor TLeftDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeWE;
 end;
 
-constructor TRightMark.Create;
+constructor TRightDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeWE;
 end;
 
-constructor TUpLeftMark.Create;
+constructor TUpLeftDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNWSE;
 end;
 
-constructor TUpRightMark.Create;
+constructor TUpRightDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNESW;
 end;
 
-constructor TDownLeftMark.Create;
+constructor TDownLeftDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNESW;
 end;
 
-constructor TDownRightMark.Create;
+constructor TDownRightDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNWSE;
 end;
 
-procedure TUpMark.Update(Control: TControl);
+procedure TUpDragHandle.UpdatePosition(Control: TControl);
 begin
   Left := Control.Left + ((Control.Width - Width) div 2);
   Top := Control.Top - (Height div 2);
 end;
 
-procedure TDownMark.Update(Control: TControl);
+procedure TDownDragHandle.UpdatePosition(Control: TControl);
 begin
   Left := Control.Left + ((Control.Width - Width) div 2);
   Top := Control.Top + Control.Height - (Height div 2);
 end;
 
-procedure TLeftMark.Update(Control: TControl);
+procedure TLeftDragHandle.UpdatePosition(Control: TControl);
 begin
   Left := Control.Left - (Width div 2);
   Top := Control.Top + ((Control.Height - Height) div 2);
 end;
 
-procedure TRightMark.Update(Control: TControl);
+procedure TRightDragHandle.UpdatePosition(Control: TControl);
 begin
   Left := Control.Left + Control.Width - (Width div 2) ;
   Top := Control.Top + ((Control.Height - Height) div 2);
 end;
 
-procedure TUpLeftMark.Update(Control: TControl);
+procedure TUpLeftDragHandle.UpdatePosition(Control: TControl);
 begin
   Left := Control.Left - (Width div 2);
   Top := Control.Top - (Height div 2);
 end;
 
-procedure TDownLeftMark.Update(Control: TControl);
+procedure TDownLeftDragHandle.UpdatePosition(Control: TControl);
 begin
   Left := Control.Left - (Width div 2);
   Top := Control.Top + Control.Height - (Height div 2);
 end;
 
-procedure TUpRightMark.Update(Control: TControl);
+procedure TUpRightDragHandle.UpdatePosition(Control: TControl);
 begin
   Left := Control.BoundsRect.Right - (Width div 2);
   Top := Control.Top - (Height div 2);
 end;
 
-procedure TDownRightMark.Update(Control: TControl);
+procedure TDownRightDragHandle.UpdatePosition(Control: TControl);
 begin
   Left := Control.BoundsRect.Right - (Width div 2);
   Top := Control.Top + Control.Height - (Height div 2);
 end;
 
-procedure TMark.Paint;
+procedure TDragHandle.Paint;
 begin
   inherited;
   Canvas.Pen.Color := RGB(0, 120, 215);
@@ -228,22 +220,22 @@ begin
   Canvas.Rectangle(0, 0, BoundsRect.Width, BoundsRect.Height);
 end;
 
-procedure TMark.SetProps(ASize: byte; AColor: TColor; AFormDesigner: IFormDesigner);
+procedure TDragHandle.SetProps(ASize: byte; AColor: TColor; AFormDesigner: IFormDesigner);
 begin
   Width := ASize;
   Height := ASize;
-  FFormDesigner := AFormDesigner;
   Color := AColor;
+  FFormDesigner := AFormDesigner;
 end;
 
-procedure TUpMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TUpDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
 begin
   Rect := FFormDesigner.GetRect();
   ChildRect := FFormDesigner.GetChildRect();
-  Log('TUpMark', 'Orig Rect', Rect);
+  Log('TUpDragHandle', 'Orig Rect', Rect);
   with Rect do
   begin
     if (Y <> Top) and (Y <> Bottom) then
@@ -263,7 +255,7 @@ begin
   end;
 end;
 
-procedure TDownMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TDownDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -289,7 +281,7 @@ begin
   end;
 end;
 
-procedure TRightMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TRightDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -315,7 +307,7 @@ begin
   end;
 end;
 
-procedure TLeftMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TLeftDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -341,7 +333,7 @@ begin
   end;
 end;
 
-procedure TUpLeftMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TUpLeftDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -386,7 +378,7 @@ begin
   end;
 end;
 
-procedure TUpRightMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TUpRightDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -427,7 +419,7 @@ begin
   end;
 end;
 
-procedure TDownLeftMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TDownLeftDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
@@ -468,15 +460,13 @@ begin
   end;
 end;
 
-procedure TDownRightMark.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TDownRightDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
 var
   Rect: TRect;
   ChildRect: TRect;
 begin
   Rect := FFormDesigner.GetRect();
-  Log('DonwnRightMark', 'MouseMoveHandler Rect', Rect);
   ChildRect := FFormDesigner.GetChildRect();
-  Log('DonwnRightMark', 'MouseMoveHandler Child', ChildRect);
   with Rect do  begin
     if (X > ChildRect.Left) and (Y > ChildRect.Top) then
     begin
