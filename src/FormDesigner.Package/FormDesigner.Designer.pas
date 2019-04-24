@@ -4,21 +4,20 @@ interface
 
 uses Classes, Controls, Graphics, Windows, Messages, Forms, SysUtils, StdCtrls,
   System.Generics.Collections, Vcl.AppEvnts, TypInfo, ExtCtrls,
-  System.DateUtils,
-  RTTI, System.SyncObjs, FormDesigner.Interfaces,
+  System.DateUtils, RTTI, System.SyncObjs, FormDesigner.Interfaces,
   FormDesigner.Utils, FormDesigner.DragHandles;
 
 type
 
   /// Conrols behavior of TFormDesigner during moving/sizing.
   TDragMode = (
-    /// Changes to control's position/size are visible immediatelly
-    /// while dragging the mouse.
-    dmImmediate,
-
     /// Changes to control's position/size are projected with a focus
     /// rectangle and are applied after the mouse is released.
-    dmDeferred);
+    dmDeferred,
+
+    /// Changes to control's position/size are visible immediatelly
+    /// while dragging the mouse. EXPERIMENTAL, needs more work.
+    dmImmediate);
 
   /// Callback for TFormDesigner.ForEachDragHandle
   TDragHandleProc = reference to procedure(DragHandle: TDragHandle);
@@ -38,7 +37,6 @@ type
     FDragHandleSize: byte;
     FRect: TRect;
     FDragHandlesVisible: Boolean;
-    FClickOrigin: TPoint;
     FControls: TObjectList<TControlInfo>;
     FDragHandleColor: TColor;
     FState: TFormDesignerState;
@@ -59,12 +57,20 @@ type
     FControlToAdd: TControl;
     FControlToAddRect: TRect;
     FControlToAddAutoSize: Boolean;
+    // Where a control was clicked in client (control)
+    // coordinates. Used while dragging the control
+    FClickOrigin: TPoint;
+    // Initial mouse position when setting dimensions
+    // for a new control (by dragging a focus rect)
     FSizingOrigin: TPoint;
+    // Mouse position in parent coordinages
+    // when a button was pressed
     FButtonDownOrigin: TPoint;
     FRectModifiers: TRectModifiers;
     FOnControlSelected: TNotifyEvent;
     FOnControlModified: TNotifyEvent;
     FOnControlAdded: TNotifyEvent;
+    FDragHandleBorderColor: TColor;
     procedure ControlSelected;
     procedure ControlModified;
     procedure ControlAdded;
@@ -73,6 +79,7 @@ type
       Value: integer; Shift: TShiftState);
     function TryGetParent(HWnd: HWnd; pt: TPoint;
       var Control: TControl): Boolean;
+    function FindControl(Handle: HWnd): TControl;
     procedure CancelSizeMove(WindowHandle: HWnd);
     procedure SetChild(Value: TControl);
     procedure SetDragHandleSize(Value: byte);
@@ -89,7 +96,6 @@ type
     procedure FormPaintHandler(Sender: TObject);
     procedure ForEachDragHandle(Proc: TDragHandleProc);
     procedure HintTimerHandler(Sender: TObject);
-    procedure FormMouseEnterHandler(Sender: TObject);
     function DragHandleOfType(DragHandleClass: TDragHandleClass): TDragHandle;
     function IsOwnedControl(Control: TControl): Boolean;
     function AlignToGrid(Num: integer; Offset: integer = 0): integer;
@@ -103,10 +109,11 @@ type
       write SetDragHandlesVisible;
     property Child: TControl read FChild write SetChild;
     procedure SetupControlToAdd(var pt: TPoint; Control: TControl);
+    procedure SetDragHandleBorderColor(const Value: TColor);
   public
     function GetRect: TRect;
     function GetChildRect: TRect;
-    procedure UpdateRect(Rect: TRect; Direction: TDirections);
+    procedure UpdateRect(Rect: TRect; Directions: TDirections);
     procedure AddControl(ControlClass: TControlClass); overload;
     procedure AddControl(AControl: TControl); overload;
     procedure RemoveControl(Control: TControl);
@@ -115,10 +122,13 @@ type
   published
     property DragHandleSize: byte read FDragHandleSize write SetDragHandleSize
       default 8;
+    property DragHandleBorderColor: TColor read FDragHandleBorderColor
+      write SetDragHandleBorderColor default TColor($D77800);
+    // RGB(0, 120, 215);
     property SnapToGrid: Boolean read FSnapToGrid write FSnapToGrid
       default True;
     property DragHandleColor: TColor read FDragHandleColor
-      write SetDragHandleColor default TColor(15980210); // RGB(178, 214, 243);
+      write SetDragHandleColor default TColor($F3D6B2); // RGB(178, 214, 243);
     property DrawGrid: Boolean read FDrawGrid write SetDrawGrid default True;
     property GridGap: integer read FGridGap write SetGridGap default 8;
     property ShowHints: Boolean read FShowHints write SetShowHints
@@ -254,8 +264,8 @@ begin
   FRectModifiers := TRectModifiers.Create;
   FControls := TObjectList<TControlInfo>.Create;
 
-  FForm.OnMouseEnter := FormMouseEnterHandler;
   FDragHandleColor := RGB(178, 214, 243);
+  FDragHandleBorderColor := RGB(0, 120, 215);
   FDragHandleSize := 8;
   FGridGap := 8;
   FSnapToGrid := True;
@@ -265,7 +275,13 @@ begin
   for DragHandleClass in DragHandleClasses do
   begin
     DragHandle := DragHandleClass.Create(Self);
-    DragHandle.SetProps(FDragHandleSize, FDragHandleColor, Self);
+    with DragHandle do
+    begin
+      Size := FDragHandleSize;
+      Color := FDragHandleColor;
+      BorderColor := FDragHandleBorderColor;
+      FormDesigner := Self;
+    end;
     InsertComponent(DragHandle);
   end;
 
@@ -283,7 +299,7 @@ begin
   end;
 
   FToolTip := TBalloonHint.Create(nil);
-  // FToolTip.HideAfter := 100;
+  FToolTip.HideAfter := 2000;
   FToolTip.Style := TBalloonHintStyle.bhsStandard;
 
 end;
@@ -310,6 +326,7 @@ begin
     Parent := Control.Parent;
     pt := Parent.ScreenToClient(Control.ClientToScreen(pt));
   end;
+  Parent.RemoveWindowStyle(WS_CLIPCHILDREN);
   with FControlToAdd do
   begin
     Visible := False;
@@ -332,7 +349,7 @@ begin
   Windows.ClipCursor(@Rect);
 end;
 
-// ApplyChanges instructs whether changes to FChild's size/position should
+// ApplyChanges tells whether changes to FChild's size/position should
 // be applied on the button relase. When False, FChild's size/position
 // is not changed.
 procedure TFormDesigner.LButtonUpHandler(var msg: tagMSG;
@@ -398,11 +415,9 @@ begin
     DC := GetDC(FParent.Handle);
     try
       RectModifier := FRectModifiers.GetForControl(FChild);
-      Log('Designer', 'Draw: FOldRect', FOldRect);
       DrawFocusRect(DC, RectModifier.Modify(FOldRect));
       if not OnlyCleanUp then
       begin
-        Log('Designer', 'Draw: FRect', FRect);
         DrawFocusRect(DC, RectModifier.Modify(FRect));
         FOldRect := FRect;
       end;
@@ -429,12 +444,10 @@ begin
       Result := Num + Offset - Remainder;
     end;
   end;
-  Log('Designer', 'Aligned %d to %d', [Num, Result]);
 end;
 
 procedure TFormDesigner.LButtonDownHandler(Sender: TControl; X, Y: integer);
 begin
-  Log('Designer', 'OnLButtonDownHandler X: %d, Y: %d', [X, Y]);
   LockMouse.Acquire;
   FButtonDownOrigin := TPoint.Create(X, Y);
   FToolTip.HideHint;
@@ -443,12 +456,12 @@ begin
   if not(Sender is TForm) then
   begin
     if Child <> Sender then
-      Child := TControl(Sender);
+      Child := Sender;
     FClickOrigin.X := X - FChild.Left;
     FClickOrigin.Y := Y - FChild.Top;
     FState := ssMoving;
-    DrawRect;
     ClipCursor;
+    DrawRect;
   end
   else
   begin
@@ -499,19 +512,14 @@ begin
 
       ssReady:
         case Key of
-
           VK_UP:
             UpdateChildProp('Top', 'Height', -1, Shift);
-
           VK_DOWN:
             UpdateChildProp('Top', 'Height', 1, Shift);
-
           VK_LEFT:
             UpdateChildProp('Left', 'Width', -1, Shift);
-
           VK_RIGHT:
             UpdateChildProp('Left', 'Width', 1, Shift);
-
           VK_DELETE:
             begin
               if FChild <> nil then
@@ -544,7 +552,6 @@ end;
 
 procedure TFormDesigner.StartSizing(DragHandle: TDragHandle; MousePos: TPoint);
 begin
-  Log('Sizer', 'StartSizing');
   LockMouse.Acquire;
   FCurrentDragHandle := DragHandle;
   FCurrentDragHandle.SetSizingOrigin(MousePos.X, MousePos.Y);
@@ -553,6 +560,7 @@ begin
   ClipCursor;
   FRect := FChild.BoundsRect;
   FOldRect := TRect.Empty;
+  FToolTip.HideHint;
   DrawRect;
 end;
 
@@ -592,7 +600,9 @@ begin
     end;
   end;
   if AControl is TWinControl then
+  begin
     TWinControl(AControl).RemoveWindowStyle(WS_CLIPCHILDREN);
+  end;
   FControls.Add(ControlInfo);
   AControl.Cursor := crArrow;
 end;
@@ -616,7 +626,6 @@ end;
 
 procedure TFormDesigner.MouseMoveHandler(Sender: TControl; X, Y: integer);
 begin
-  Log('Designer', 'MouseMoveHandler: X: %d, Y: %d', [X, Y]);
   if PointsEqual(FButtonDownOrigin, TPoint.Create(X, Y)) then
     Exit;
 
@@ -643,6 +652,7 @@ begin
     else
       DrawRect;
   end;
+
 end;
 
 procedure TFormDesigner.HintTimerHandler(Sender: TObject);
@@ -658,14 +668,14 @@ begin
     begin
       CursorPos := Mouse.CursorPos;
       Control := Controls.FindVCLWindow(CursorPos);
-      if (Control <> nil) and IsOwnedControl(Control) then
+      if Assigned(Control) then
       begin
         Child := TWinControl(Control)
-          .ControlAtPos(Control.ScreenToClient(CursorPos), True);
+          .ControlAtPos(Control.ScreenToClient(CursorPos), True, True, True);
         // Is there a pure Delphi control? (TLabel, TShape, ... )
         if Assigned(Child) then
           Control := Child;
-        if (Control <> FLastHintedControl) then
+        if (Control <> FLastHintedControl) and IsOwnedControl(Control) then
         begin
           FLastHintedControl := Control;
           FToolTip.Description :=
@@ -681,12 +691,6 @@ begin
         FToolTip.HideHint;
     end;
   end;
-end;
-
-procedure TFormDesigner.FormMouseEnterHandler(Sender: TObject);
-begin
-  FToolTip.HideHint;
-  FLastHintedControl := nil;
 end;
 
 procedure TFormDesigner.FormPaintHandler;
@@ -706,13 +710,14 @@ end;
 
 procedure TFormDesigner.SetChild(Value: TControl);
 begin
-  FOldRect := TRect.Empty;
   FChild := Value;
   if Assigned(FChild) then
   begin
     FParent := FChild.Parent;
     FRect := Child.BoundsRect;
-    FChild.BringToFront;
+    // Internally, Delphi manipulates windows during BringToFront
+    // which brings troubles with painting focus rect
+    // FChild.BringToFront;
     ForEachDragHandle(
       procedure(DragHandle: TDragHandle)
       begin
@@ -725,6 +730,7 @@ begin
   begin
     FRect := TRect.Empty;
   end;
+  FOldRect := TRect.Empty;
   ControlSelected;
 end;
 
@@ -737,56 +743,68 @@ begin
     end);
 end;
 
-procedure TFormDesigner.UpdateRect(Rect: TRect; Direction: TDirections);
+procedure TFormDesigner.UpdateRect(Rect: TRect; Directions: TDirections);
 begin
-  Log('Designer', 'UpdateRect', Rect);
-  if (not FSnapToGrid) or
-    ((((Direction = dRight) or (Direction = dUpRight) or
-    (Direction = dDownRight)) and (Rect.Right mod FGridGap = 0)) or
-    (((Direction = dLeft) or (Direction = dUpLeft) or (Direction = dDownLeft))
-    and (Rect.Left mod FGridGap = 0)) or
-    (((Direction = dUp) or (Direction = dUpLeft) or (Direction = dUpRight)) and
-    (Rect.Top mod FGridGap = 0)) or
-    (((Direction = dDown) or (Direction = dDownLeft) or (Direction = dDownRight)
-    ) and (Rect.Bottom mod FGridGap = 0))) then
+  FRect := Rect;
+  if FSnapToGrid then
   begin
-    FRect := Rect;
-    if (FDragMode = dmImmediate) then
-      FChild.BoundsRect := FRect
-    else
-      DrawRect;
-  end
+    if dLeft in Directions then
+      FRect.Left := AlignToGrid(FRect.Left);
+
+    if dRight in Directions then
+      FRect.Right := AlignToGrid(FRect.Right);
+
+    if dTop in Directions then
+      FRect.Top := AlignToGrid(FRect.Top);
+
+    if dBottom in Directions then
+      FRect.Bottom := AlignToGrid(FRect.Bottom);
+  end;
+
+  if (FDragMode = dmImmediate) then
+    FChild.BoundsRect := FRect
+  else
+    DrawRect;
 end;
 
-procedure TFormDesigner.CallMessageHandler(msg: UINT; Control: TWinControl;
-var pt: TPoint; Handler: TMessageHandler);
+procedure TFormDesigner.MessageReceivedHandler(var msg: tagMSG;
+var Handled: Boolean);
+var
+  Control: TControl;
+  pt: TPoint;
 begin
-  case msg of
-
+  case msg.message of
     WM_MOUSEMOVE:
       begin
-        pt := FChild.Parent.ScreenToClient(Control.ClientToScreen(pt));
-        Handler(Control.Parent, pt.X, pt.Y);
+        if FState = ssMoving then
+          PreProcessMessage(msg, MouseMoveHandler)
+        else if FState = ssSizing then
+          PreProcessMessage(msg, FCurrentDragHandle.MouseMoveHandler)
+        else if FShowHints and (msg.HWnd = FForm.Handle) and
+          not Assigned(FForm.ControlAtPos(MAKEPOINT(msg.lParam), True, True,
+          True)) then
+        begin
+          FToolTip.HideHint;
+          FLastHintedControl := nil;
+        end;
       end;
 
     WM_LBUTTONDOWN:
       begin
-        Child := Control.ControlAtPos(pt, True);
-        if Child <> nil then
-        begin
-          if IsOwnedControl(Child) then
-            Handler(Child, pt.X, pt.Y)
-        end
+        Control := FindControl(msg.HWnd);
+        if (Control is TDragHandle) then
+          StartSizing(TDragHandle(Control), MAKEPOINT(msg.lParam))
         else
-        begin
-          if IsOwnedControl(Control) or (Control = FForm) then
-          begin
-            if Control.Parent <> nil then
-              pt := Control.Parent.ScreenToClient(Control.ClientToScreen(pt));
-            Handler(Control, pt.X, pt.Y);
-          end;
-        end;
+          PreProcessMessage(msg, LButtonDownHandler);
       end;
+
+    WM_LBUTTONUP:
+      begin
+        LButtonUpHandler(msg, True);
+      end;
+
+    WM_KEYDOWN:
+      KeyDownHandler(msg);
 
   end;
 end;
@@ -819,44 +837,36 @@ begin
   end;
 end;
 
-procedure TFormDesigner.MessageReceivedHandler(var msg: tagMSG;
-var Handled: Boolean);
-var
-  Control: TControl;
+procedure TFormDesigner.CallMessageHandler(msg: UINT; Control: TWinControl;
+var pt: TPoint; Handler: TMessageHandler);
 begin
-  case msg.message of
+  case msg of
+
     WM_MOUSEMOVE:
       begin
-        if FState = ssMoving then
-        begin
-          Log('Designer', 'WM_MOUSEMOVE (%d)', [msg.HWnd]);
-          PreProcessMessage(msg, MouseMoveHandler)
-        end
-        else if FState = ssSizing then
-        begin
-          Log('Designer', 'WM_MOUSEMOVE (%d)', [msg.HWnd]);
-          PreProcessMessage(msg, FCurrentDragHandle.MouseMoveHandler);
-        end;
+        pt := FChild.Parent.ScreenToClient(Control.ClientToScreen(pt));
+        Handler(Control.Parent, pt.X, pt.Y);
       end;
 
     WM_LBUTTONDOWN:
       begin
-        Log('Designer', 'WM_LBUTTONDOWN (%d)', [msg.HWnd]);
-        Control := FindControl(msg.HWnd);
-        if (Control is TDragHandle) then
-          StartSizing(TDragHandle(Control), MAKEPOINT(msg.lParam))
+        Child := Control.ControlAtPos(pt, True);
+        if Child <> nil then
+        begin
+          if IsOwnedControl(Child) then
+            Handler(Child, pt.X, pt.Y)
+        end
         else
-          PreProcessMessage(msg, LButtonDownHandler);
+        begin
+          // Handle clicks on an owned control or parent form
+          if IsOwnedControl(Control) or (Control = FForm) then
+          begin
+            if Control.Parent <> nil then
+              pt := Control.Parent.ScreenToClient(Control.ClientToScreen(pt));
+            Handler(Control, pt.X, pt.Y);
+          end;
+        end;
       end;
-
-    WM_LBUTTONUP:
-      begin
-        Log('Designer', 'WM_LBUTTONUP (%d)', [msg.HWnd]);
-        LButtonUpHandler(msg, True);
-      end;
-
-    WM_KEYDOWN:
-      KeyDownHandler(msg);
 
   end;
 end;
@@ -874,15 +884,21 @@ begin
     Control := FindControl(GetParent(HWnd));
     if (Control <> nil) then
     begin
-      Log('Designer', 'EDIT event, Orig pt: pt.X: %d, pt.Y: %d', [pt.X, pt.Y]);
       ClientToScreen(HWnd, pt);
       pt := Control.ScreenToClient(pt);
-      Log('Designer', 'EDIT event: Control.Name: %s, pt.X: %d, pt.Y: %d',
-        [Control.Name, pt.X, pt.Y]);
-      // CallMessageHandler(msg.message, TWinControl(Control), pt, Handler);
       Result := True;
     end;
   end;
+end;
+
+procedure TFormDesigner.SetDragHandleBorderColor(const Value: TColor);
+begin
+  FDragHandleBorderColor := Value;
+  ForEachDragHandle(
+    procedure(DragHandle: TDragHandle)
+    begin
+      DragHandle.BorderColor := FDragHandleBorderColor;
+    end);
 end;
 
 procedure TFormDesigner.SetDragHandleColor(Value: TColor);
@@ -891,7 +907,7 @@ begin
   ForEachDragHandle(
     procedure(DragHandle: TDragHandle)
     begin
-      DragHandle.SetProps(FDragHandleSize, FDragHandleColor, Self);
+      DragHandle.Color := FDragHandleColor;
     end);
 end;
 
@@ -933,15 +949,12 @@ end;
 
 procedure TFormDesigner.SetDragHandlesVisible(Value: Boolean);
 begin
-  Log('Designer', 'DragHandlesVisible: From: %s to %s',
-    [BoolToStr(FDragHandlesVisible), BoolToStr(Value)]);
   FDragHandlesVisible := Value;
   ForEachDragHandle(
     procedure(DragHandle: TDragHandle)
     begin
       DragHandle.Visible := Value;
     end);
-  // Application.ProcessMessages;
   FForm.Update;
 end;
 
@@ -981,7 +994,11 @@ end;
 
 procedure TFormDesigner.SetShowHints(Value: Boolean);
 begin
-  FHintTimer.Enabled := Value;
+  FShowHints := Value;
+  if not(csDesigning in ComponentState) then
+  begin
+    FHintTimer.Enabled := Value;
+  end;
 end;
 
 function TFormDesigner.IsOwnedControl(Control: TControl): Boolean;
@@ -995,6 +1012,13 @@ begin
       Result := True;
       Exit;
     end;
+end;
+
+function TFormDesigner.FindControl(Handle: HWnd): TControl;
+begin
+  Result := Vcl.Controls.FindControl(Handle);
+  if not Assigned(Result) then
+    TryGetParent(Handle, TPoint.Zero, Result);
 end;
 
 procedure TFormDesigner.ForEachDragHandle(Proc: TDragHandleProc);
