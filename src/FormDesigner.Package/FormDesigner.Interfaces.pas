@@ -8,12 +8,11 @@ uses Classes, Controls, Graphics, Windows, Messages, Forms, SysUtils, StdCtrls,
 type
 
   TFormDesignerState = (ssReady, ssMoving, ssSizing);
-  TDirection = (dBottom, dTop, dLeft, dRight, dUpLeft, dUpRight, dDownLeft,
-    dDownRight, dPosChange);
+  TDirection = (dBottom, dTop, dLeft, dRight);
   TDirections = set of TDirection;
 
   IFormDesigner = interface
-    function GetRect : TRect;
+    function GetDragRect : TRect;
     function GetChildRect : TRect;
     procedure UpdateRect(Rect: TRect; Direction: TDirections);
   end;

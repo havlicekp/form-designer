@@ -34,8 +34,8 @@ type
   private
     FParent: TWinControl;
     FChild: TControl;
-    FDragHandleSize: byte;
-    FRect: TRect;
+    FDragHandleSize: Byte;
+    FDragRect: TRect;
     FDragHandlesVisible: Boolean;
     FControls: TObjectList<TControlInfo>;
     FDragHandleColor: TColor;
@@ -111,7 +111,7 @@ type
     procedure SetupControlToAdd(var pt: TPoint; Control: TControl);
     procedure SetDragHandleBorderColor(const Value: TColor);
   public
-    function GetRect: TRect;
+    function GetDragRect: TRect;
     function GetChildRect: TRect;
     procedure UpdateRect(Rect: TRect; Directions: TDirections);
     procedure AddControl(ControlClass: TControlClass); overload;
@@ -371,7 +371,7 @@ begin
       // Should we apply changes to size/position?
       if ApplyChanges then
       begin
-        FChild.BoundsRect := FRect;
+        FChild.BoundsRect := FDragRect;
         UpdateDragHandles;
       end;
       DragHandlesVisible := True;
@@ -379,7 +379,7 @@ begin
 
     if Assigned(FControlToAdd) then
     begin
-      MousePos.SetLocation(GET_X_LPARAM(msg.lParam), GET_Y_LPARAM(msg.lParam));
+      MousePos.SetLocation(MAKEPOINT(msg.lParam));
       if FControlToAdd.BoundsRect.BottomRight.IsZero or
         PointsEqual(FSizingOrigin, MousePos) then
       begin
@@ -418,8 +418,8 @@ begin
       DrawFocusRect(DC, RectModifier.Modify(FOldRect));
       if not OnlyCleanUp then
       begin
-        DrawFocusRect(DC, RectModifier.Modify(FRect));
-        FOldRect := FRect;
+        DrawFocusRect(DC, RectModifier.Modify(FDragRect));
+        FOldRect := FDragRect;
       end;
     finally
       ReleaseDC(FParent.Handle, DC);
@@ -494,7 +494,7 @@ begin
     PropValue := PropValue + Value;
     SetOrdProp(FChild, ShiftPropName, PropValue);
   end;
-  FRect := FChild.BoundsRect;
+  FDragRect := FChild.BoundsRect;
   UpdateDragHandles;
   ControlModified;
 end;
@@ -558,7 +558,7 @@ begin
   FState := ssSizing;
   DragHandlesVisible := False;
   ClipCursor;
-  FRect := FChild.BoundsRect;
+  FDragRect := FChild.BoundsRect;
   FOldRect := TRect.Empty;
   FToolTip.HideHint;
   DrawRect;
@@ -634,21 +634,21 @@ begin
 
   if (FSnapToGrid) then
   begin
-    FRect.Left := AlignToGrid(X - FClickOrigin.X, FChild.Left mod FGridGap);
-    FRect.Top := AlignToGrid(Y - FClickOrigin.Y, FChild.Top mod FGridGap);
+    FDragRect.Left := AlignToGrid(X - FClickOrigin.X, FChild.Left mod FGridGap);
+    FDragRect.Top := AlignToGrid(Y - FClickOrigin.Y, FChild.Top mod FGridGap);
   end
   else
   begin
-    FRect.Left := X - FClickOrigin.X;
-    FRect.Top := Y - FClickOrigin.Y;
+    FDragRect.Left := X - FClickOrigin.X;
+    FDragRect.Top := Y - FClickOrigin.Y;
   end;
-  FRect.Bottom := FRect.Top + FChild.Height;
-  FRect.Right := FRect.Left + FChild.Width;
+  FDragRect.Bottom := FDragRect.Top + FChild.Height;
+  FDragRect.Right := FDragRect.Left + FChild.Width;
 
   if FState = ssMoving then
   begin
     if FDragMode = dmImmediate then
-      FChild.SetBounds(FRect.Left, FRect.Top, FRect.Width, FRect.Height)
+      FChild.SetBounds(FDragRect.Left, FDragRect.Top, FDragRect.Width, FDragRect.Height)
     else
       DrawRect;
   end;
@@ -714,7 +714,7 @@ begin
   if Assigned(FChild) then
   begin
     FParent := FChild.Parent;
-    FRect := Child.BoundsRect;
+    FDragRect := Child.BoundsRect;
     // Internally, Delphi manipulates windows during BringToFront
     // which brings troubles with painting focus rect
     // FChild.BringToFront;
@@ -728,7 +728,7 @@ begin
   end
   else
   begin
-    FRect := TRect.Empty;
+    FDragRect := TRect.Empty;
   end;
   FOldRect := TRect.Empty;
   ControlSelected;
@@ -745,24 +745,24 @@ end;
 
 procedure TFormDesigner.UpdateRect(Rect: TRect; Directions: TDirections);
 begin
-  FRect := Rect;
+  FDragRect := Rect;
   if FSnapToGrid then
   begin
     if dLeft in Directions then
-      FRect.Left := AlignToGrid(FRect.Left);
+      FDragRect.Left := AlignToGrid(FDragRect.Left);
 
     if dRight in Directions then
-      FRect.Right := AlignToGrid(FRect.Right);
+      FDragRect.Right := AlignToGrid(FDragRect.Right);
 
     if dTop in Directions then
-      FRect.Top := AlignToGrid(FRect.Top);
+      FDragRect.Top := AlignToGrid(FDragRect.Top);
 
     if dBottom in Directions then
-      FRect.Bottom := AlignToGrid(FRect.Bottom);
+      FDragRect.Bottom := AlignToGrid(FDragRect.Bottom);
   end;
 
   if (FDragMode = dmImmediate) then
-    FChild.BoundsRect := FRect
+    FChild.BoundsRect := FDragRect
   else
     DrawRect;
 end;
@@ -963,9 +963,9 @@ begin
   Result := FChild.BoundsRect;
 end;
 
-function TFormDesigner.GetRect: TRect;
+function TFormDesigner.GetDragRect: TRect;
 begin
-  Result := FRect;
+  Result := FDragRect;
 end;
 
 function TFormDesigner.DragHandleOfType(DragHandleClass: TDragHandleClass)

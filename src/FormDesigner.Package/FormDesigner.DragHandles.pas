@@ -15,15 +15,15 @@ type
     FHorizontalFix: TDirection;
     FVerticalFix: TDirection;
     FFormDesigner: IFormDesigner;
-    FSize: Integer;
+    FSize: Byte;
     FBorderColor: TColor;
     function GetRectSide(const Rect: TRect; Direction: TDirection) : Integer;
-    procedure SetSize(const Value: Integer);
+    procedure SetSize(const Value: Byte);
   public
     property Color;
     property BorderColor : TColor read FBorderColor write FBorderColor;
     property FormDesigner: IFormDesigner read FFormDesigner write FFormDesigner;
-    property Size: Integer read FSize write SetSize;
+    property Size: Byte read FSize write SetSize;
     procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); virtual; abstract;
     procedure SetSizingOrigin(const X, Y: Integer);
     procedure UpdatePosition(Control: TControl); virtual; abstract;
@@ -105,7 +105,7 @@ begin
   FBorderColor := RGB(0, 120, 215);
 end;
 
-procedure TDragHandle.SetSize(const Value: Integer);
+procedure TDragHandle.SetSize(const Value: Byte);
 begin
   FSize := Value;
   Width := Value;
@@ -133,20 +133,6 @@ begin
     else
       FClickOrigin.Y := HalfWidth - Y;
   end;
-end;
-
-function TDragHandle.GetRectSide(const Rect: TRect; Direction: TDirection): Integer;
-var
-  RectType: TRttiType;
-  Field: TRttiField;
-  DirectionStr: String;
-begin
-  DirectionStr := TRttiEnumerationType.GetName(Direction);
-  Assert(DirectionStr.StartsWith('d'));
-  DirectionStr := DirectionStr.Remove(0, 1);
-  RectType := TRTTIContext.Create.GetType(TypeInfo(TRect));
-  Field := RectType.GetField(DirectionStr);
-  Result := Field.GetValue(@Rect).AsInteger;
 end;
 
 procedure TDragHandle.Paint;
@@ -268,14 +254,14 @@ end;
 
 procedure TVerticalDragHandle.MouseMoveHandler(Sender: TControl; X, Y: Integer);
 var
-  Rect: TRect;
+  DragRect: TRect;
   ChildRect: TRect;
   VerticalFix: Integer;
 begin
-  Rect := FFormDesigner.GetRect();
+  DragRect := FFormDesigner.GetDragRect();
   ChildRect := FFormDesigner.GetChildRect();
   VerticalFix := GetRectSide(ChildRect, FVerticalFix);
-  with Rect do
+  with DragRect do
   begin
     if (Y <> Top) and (Y <> Bottom) then
     begin
@@ -283,13 +269,13 @@ begin
       begin
         Top := VerticalFix;
         Bottom := Y + FClickOrigin.Y;
-        FFormDesigner.UpdateRect(Rect, [dBottom]);
+        FFormDesigner.UpdateRect(DragRect, [dBottom]);
       end
       else
       begin
         Top := Y + FClickOrigin.Y;
         Bottom := VerticalFix;
-        FFormDesigner.UpdateRect(Rect, [dTop]);
+        FFormDesigner.UpdateRect(DragRect, [dTop]);
       end;
     end;
   end;
@@ -297,14 +283,14 @@ end;
 
 procedure THorizontalDragHandle.MouseMoveHandler(Sender: TControl; X: Integer; Y: Integer);
 var
-  Rect: TRect;
+  DragRect: TRect;
   ChildRect: TRect;
   HorizontalFix: Integer;
 begin
-  Rect := FFormDesigner.GetRect();
+  DragRect := FFormDesigner.GetDragRect();
   ChildRect := FFormDesigner.GetChildRect();
   HorizontalFix := GetRectSide(ChildRect, FHorizontalFix);
-  with Rect do
+  with DragRect do
   begin
     if (X <> Right) and (X <> Left) then
     begin
@@ -312,13 +298,13 @@ begin
       begin
         Left := HorizontalFix;
         Right := X + FClickOrigin.X;
-        FFormDesigner.UpdateRect(Rect, [dRight]);
+        FFormDesigner.UpdateRect(DragRect, [dRight]);
       end
       else
       begin
         Left := X + FClickOrigin.X;
         Right := HorizontalFix;
-        FFormDesigner.UpdateRect(Rect, [dLeft]);
+        FFormDesigner.UpdateRect(DragRect, [dLeft]);
       end;
     end;
   end;
@@ -326,15 +312,15 @@ end;
 
 procedure TMultiDirectionalDragHandle.MouseMoveHandler(Sender: TControl; X, Y: Integer);
 var
-  Rect: TRect;
+  DragRect: TRect;
   ChildRect: TRect;
   HorizontalFix, VerticalFix: Integer;
 begin
-  Rect := FFormDesigner.GetRect();
+  DragRect := FFormDesigner.GetDragRect();
   ChildRect := FFormDesigner.GetChildRect();
   HorizontalFix := GetRectSide(ChildRect, FHorizontalFix);
   VerticalFix := GetRectSide(ChildRect, FVerticalFix);
-  with Rect do
+  with DragRect do
   begin
     if (X > HorizontalFix) and (Y > VerticalFix) then
     begin
@@ -342,7 +328,7 @@ begin
       Top := VerticalFix;
       Right := X + FClickOrigin.X;
       Bottom := Y + FClickOrigin.Y;
-      FFormDesigner.UpdateRect(Rect, [dRight, dBottom]);
+      FFormDesigner.UpdateRect(DragRect, [dRight, dBottom]);
     end;
     if (X < HorizontalFix) and (Y > VerticalFix) then
     begin
@@ -350,7 +336,7 @@ begin
       Top := VerticalFix;
       Right := HorizontalFix;
       Bottom := Y + FClickOrigin.Y;
-      FFormDesigner.UpdateRect(Rect, [dLeft, dBottom]);
+      FFormDesigner.UpdateRect(DragRect, [dLeft, dBottom]);
     end;
     if (X > HorizontalFix) and (Y < VerticalFix) then
     begin
@@ -358,7 +344,7 @@ begin
       Top := Y + FClickOrigin.Y;
       Right := X + FClickOrigin.X;
       Bottom := VerticalFix;
-      FFormDesigner.UpdateRect(Rect, [dRight, dTop]);
+      FFormDesigner.UpdateRect(DragRect, [dRight, dTop]);
     end;
     if (X < HorizontalFix) and (Y < VerticalFix) then
     begin
@@ -366,9 +352,23 @@ begin
       Top := Y + FClickOrigin.Y;
       Right := HorizontalFix;
       Bottom := VerticalFix;
-      FFormDesigner.UpdateRect(Rect, [dLeft, dTop]);
+      FFormDesigner.UpdateRect(DragRect, [dLeft, dTop]);
     end;
   end;
+end;
+
+function TDragHandle.GetRectSide(const Rect: TRect; Direction: TDirection): Integer;
+var
+  RectType: TRttiType;
+  Field: TRttiField;
+  DirectionStr: String;
+begin
+  DirectionStr := TRttiEnumerationType.GetName(Direction);
+  Assert(DirectionStr.StartsWith('d'));
+  DirectionStr := DirectionStr.Remove(0, 1);
+  RectType := TRTTIContext.Create.GetType(TypeInfo(TRect));
+  Field := RectType.GetField(DirectionStr);
+  Result := Field.GetValue(@Rect).AsInteger;
 end;
 
 end.
