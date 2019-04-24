@@ -156,9 +156,9 @@
             <ResourceType>RCDATA</ResourceType>
             <ResourceId>TPROGRESSBAR</ResourceId>
         </RcItem>
-        <RcItem Include="Images\ttrackbar.png">
+        <RcItem Include="Images\tshape.png">
             <ResourceType>RCDATA</ResourceType>
-            <ResourceId>TTRACKBAR</ResourceId>
+            <ResourceId>TSHAPE</ResourceId>
         </RcItem>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
@@ -186,13 +186,13 @@
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="3">
-                <DeployFile LocalName="Images\tcombobox.png" Configuration="Debug" Class="ProjectFile">
+                <DeployFile LocalName="Images\tshape.png" Configuration="Debug" Class="ProjectFile">
                     <Platform Name="Win32">
                         <RemoteDir>.\</RemoteDir>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="Images\ttrackbar.png" Configuration="Debug" Class="ProjectFile">
+                <DeployFile LocalName="Images\tcombobox.png" Configuration="Debug" Class="ProjectFile">
                     <Platform Name="Win32">
                         <RemoteDir>.\</RemoteDir>
                         <Overwrite>true</Overwrite>
