@@ -3,7 +3,8 @@ unit FormDesigner.DragHandles;
 interface
 
 uses Classes, Controls, Graphics, Windows, Messages, Forms, SysUtils, StdCtrls,
-  System.Generics.Collections, FormDesigner.Interfaces, FormDesigner.Utils;
+  RTTI, System.Generics.Collections, FormDesigner.Interfaces,
+  FormDesigner.Utils;
 
 type
 
@@ -11,69 +12,82 @@ type
   TDragHandle = class(TCustomControl)
   private
     FClickOrigin: TPoint;
+    FHorizontalFix: TDirection;
+    FVerticalFix: TDirection;
     FFormDesigner: IFormDesigner;
+    FSize: Integer;
+    FBorderColor: TColor;
+    function GetRectSide(const Rect: TRect; Direction: TDirection) : Integer;
+    procedure SetSize(const Value: Integer);
   public
+    property Color;
+    property BorderColor : TColor read FBorderColor write FBorderColor;
+    property FormDesigner: IFormDesigner read FFormDesigner write FFormDesigner;
+    property Size: Integer read FSize write SetSize;
+    procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); virtual; abstract;
     procedure SetSizingOrigin(const X, Y: Integer);
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); virtual; abstract;
     procedure UpdatePosition(Control: TControl); virtual; abstract;
-    procedure SetProps(ASize: byte; AColor: TColor; AFormDesigner: IFormDesigner);
     procedure Paint; override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  TUpDragHandle = class(TDragHandle)
+  THorizontalDragHandle = class(TDragHandle)
+    procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); override;
+  end;
+
+  TVerticalDragHandle = class(TDragHandle)
+    procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); override;
+  end;
+
+  TMultiDirectionalDragHandle = class(TDragHandle)
+    procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); override;
+  end;
+
+  TUpDragHandle = class(TVerticalDragHandle)
   public
     procedure UpdatePosition(Control: TControl); override;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  TDownDragHandle = class(TDragHandle)
+  TDownDragHandle = class(TVerticalDragHandle)
   public
     procedure UpdatePosition(Control: TControl); override;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  TLeftDragHandle = class(TDragHandle)
+  TLeftDragHandle = class(THorizontalDragHandle)
   public
     procedure UpdatePosition(Control: TControl); override;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  TRightDragHandle = class(TDragHandle)
+  TRightDragHandle = class(THorizontalDragHandle)
   public
     procedure UpdatePosition(Control: TControl); override;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  TUpLeftDragHandle = class(TDragHandle)
+  TUpLeftDragHandle = class(TMultiDirectionalDragHandle)
   public
     procedure UpdatePosition(Control: TControl); override;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  TUpRightDragHandle = class(TDragHandle)
+  TUpRightDragHandle = class(TMultiDirectionalDragHandle)
   public
     procedure UpdatePosition(Control: TControl); override;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  TDownLeftDragHandle = class(TDragHandle)
+  TDownLeftDragHandle = class(TMultiDirectionalDragHandle)
   public
     procedure UpdatePosition(Control: TControl); override;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
-  TDownRightDragHandle = class(TDragHandle)
+  TDownRightDragHandle = class(TMultiDirectionalDragHandle)
   public
     procedure UpdatePosition(Control: TControl); override;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: integer); override;
     constructor Create(AOwner: TComponent); override;
   end;
 
@@ -88,6 +102,14 @@ begin
   inherited Create(AOwner);
   Visible := False;
   FClickOrigin := TPoint.Zero;
+  FBorderColor := RGB(0, 120, 215);
+end;
+
+procedure TDragHandle.SetSize(const Value: Integer);
+begin
+  FSize := Value;
+  Width := Value;
+  Height := Value;
 end;
 
 procedure TDragHandle.SetSizingOrigin(const X, Y: Integer);
@@ -111,56 +133,89 @@ begin
     else
       FClickOrigin.Y := HalfWidth - Y;
   end;
+end;
 
-  Log('TDragHandle', 'X: %d, Y: %d, FClickOrigin.X: %d, FClickOrigin.Y: %d', [X, Y, FClickOrigin.X, FClickOrigin.Y]);
+function TDragHandle.GetRectSide(const Rect: TRect; Direction: TDirection): Integer;
+var
+  RectType: TRttiType;
+  Field: TRttiField;
+  DirectionStr: String;
+begin
+  DirectionStr := TRttiEnumerationType.GetName(Direction);
+  Assert(DirectionStr.StartsWith('d'));
+  DirectionStr := DirectionStr.Remove(0, 1);
+  RectType := TRTTIContext.Create.GetType(TypeInfo(TRect));
+  Field := RectType.GetField(DirectionStr);
+  Result := Field.GetValue(@Rect).AsInteger;
+end;
+
+procedure TDragHandle.Paint;
+begin
+  inherited;
+  Canvas.Pen.Color := FBorderColor;
+  Canvas.FillRect(ClientRect);
+  Canvas.Brush.Color := Color;
+  Canvas.Rectangle(0, 0, BoundsRect.Width, BoundsRect.Height);
 end;
 
 constructor TUpDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNS;
+  FVerticalFix := dBottom;
 end;
 
 constructor TDownDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNS;
+  FVerticalFix := dTop;
 end;
 
 constructor TLeftDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeWE;
+  FHorizontalFix := dRight;
 end;
 
 constructor TRightDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeWE;
+  FHorizontalFix := dLeft;
 end;
 
 constructor TUpLeftDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNWSE;
+  FHorizontalFix := dRight;
+  FVerticalFix := dBottom;
 end;
 
 constructor TUpRightDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNESW;
+  FHorizontalFix := dLeft;
+  FVerticalFix := dBottom;
 end;
 
 constructor TDownLeftDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNESW;
+  FHorizontalFix := dRight;
+  FVerticalFix := dTop;
 end;
 
 constructor TDownRightDragHandle.Create;
 begin
   inherited Create(AOwner);
   Cursor := crSizeNWSE;
+  FHorizontalFix := dLeft;
+  FVerticalFix := dTop;
 end;
 
 procedure TUpDragHandle.UpdatePosition(Control: TControl);
@@ -183,7 +238,7 @@ end;
 
 procedure TRightDragHandle.UpdatePosition(Control: TControl);
 begin
-  Left := Control.Left + Control.Width - (Width div 2) ;
+  Left := Control.Left + Control.Width - (Width div 2);
   Top := Control.Top + ((Control.Height - Height) div 2);
 end;
 
@@ -211,292 +266,108 @@ begin
   Top := Control.Top + Control.Height - (Height div 2);
 end;
 
-procedure TDragHandle.Paint;
-begin
-  inherited;
-  Canvas.Pen.Color := RGB(0, 120, 215);
-  Canvas.FillRect(ClientRect);
-  Canvas.Brush.Color := Color;
-  Canvas.Rectangle(0, 0, BoundsRect.Width, BoundsRect.Height);
-end;
-
-procedure TDragHandle.SetProps(ASize: byte; AColor: TColor; AFormDesigner: IFormDesigner);
-begin
-  Width := ASize;
-  Height := ASize;
-  Color := AColor;
-  FFormDesigner := AFormDesigner;
-end;
-
-procedure TUpDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TVerticalDragHandle.MouseMoveHandler(Sender: TControl; X, Y: Integer);
 var
   Rect: TRect;
   ChildRect: TRect;
+  VerticalFix: Integer;
 begin
   Rect := FFormDesigner.GetRect();
   ChildRect := FFormDesigner.GetChildRect();
-  Log('TUpDragHandle', 'Orig Rect', Rect);
+  VerticalFix := GetRectSide(ChildRect, FVerticalFix);
   with Rect do
   begin
     if (Y <> Top) and (Y <> Bottom) then
     begin
-      if Y > ChildRect.Top + ChildRect.Height then
+      if Y >= VerticalFix then
       begin
-        Top := ChildRect.Top + ChildRect.Height;
+        Top := VerticalFix;
         Bottom := Y + FClickOrigin.Y;
+        FFormDesigner.UpdateRect(Rect, [dBottom]);
       end
       else
       begin
         Top := Y + FClickOrigin.Y;
-        Bottom := ChildRect.Top + ChildRect.Height;
+        Bottom := VerticalFix;
+        FFormDesigner.UpdateRect(Rect, [dTop]);
       end;
-      FFormDesigner.UpdateRect(Rect, dUp);
     end;
   end;
 end;
 
-procedure TDownDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure THorizontalDragHandle.MouseMoveHandler(Sender: TControl; X: Integer; Y: Integer);
 var
   Rect: TRect;
   ChildRect: TRect;
+  HorizontalFix: Integer;
 begin
   Rect := FFormDesigner.GetRect();
   ChildRect := FFormDesigner.GetChildRect();
+  HorizontalFix := GetRectSide(ChildRect, FHorizontalFix);
   with Rect do
   begin
-    if (Y <> Rect.Bottom) and (Y <> Rect.Top) then
+    if (X <> Right) and (X <> Left) then
     begin
-      if Y < ChildRect.Top then
+      if X > HorizontalFix then
       begin
-        Rect.Top := Y + FClickOrigin.Y;
-        Rect.Bottom := ChildRect.Top
+        Left := HorizontalFix;
+        Right := X + FClickOrigin.X;
+        FFormDesigner.UpdateRect(Rect, [dRight]);
       end
       else
       begin
-        Rect.Bottom := Y + FClickOrigin.Y;
-        Rect.Top := ChildRect.Top
+        Left := X + FClickOrigin.X;
+        Right := HorizontalFix;
+        FFormDesigner.UpdateRect(Rect, [dLeft]);
       end;
-      FFormDesigner.UpdateRect(Rect, dDown);
     end;
   end;
 end;
 
-procedure TRightDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
+procedure TMultiDirectionalDragHandle.MouseMoveHandler(Sender: TControl; X, Y: Integer);
 var
   Rect: TRect;
   ChildRect: TRect;
+  HorizontalFix, VerticalFix: Integer;
 begin
   Rect := FFormDesigner.GetRect();
   ChildRect := FFormDesigner.GetChildRect();
+  HorizontalFix := GetRectSide(ChildRect, FHorizontalFix);
+  VerticalFix := GetRectSide(ChildRect, FVerticalFix);
   with Rect do
   begin
-    if (X <> Rect.Right) and (X <> Rect.Left) then
+    if (X > HorizontalFix) and (Y > VerticalFix) then
     begin
-      if X > ChildRect.Left then
-      begin
-        Rect.Left := ChildRect.Left;
-        Rect.Right := X + FClickOrigin.X;
-      end
-      else
-      begin
-        Rect.Left := X + FClickOrigin.X;
-        Rect.Right := ChildRect.Left;
-      end;
-      FFormDesigner.UpdateRect(Rect, dRight);
+      Left := HorizontalFix;
+      Top := VerticalFix;
+      Right := X + FClickOrigin.X;
+      Bottom := Y + FClickOrigin.Y;
+      FFormDesigner.UpdateRect(Rect, [dRight, dBottom]);
     end;
-  end;
-end;
-
-procedure TLeftDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
-var
-  Rect: TRect;
-  ChildRect: TRect;
-begin
-  Rect := FFormDesigner.GetRect();
-  ChildRect := FFormDesigner.GetChildRect();
-  with Rect do
-  begin
-    if (X <> Rect.Left) and (X <> Rect.Right) then
+    if (X < HorizontalFix) and (Y > VerticalFix) then
     begin
-      if X > ChildRect.Left + ChildRect.Width then
-      begin
-        Rect.Left := ChildRect.Left + ChildRect.Width;
-        Rect.Right := X + FClickOrigin.X;
-      end
-      else
-      begin
-        Rect.Left := X + FClickOrigin.X;
-        Rect.Right := ChildRect.Left + ChildRect.Width;
-      end;
-      FFormDesigner.UpdateRect(Rect, dLeft);
+      Left := X + FClickOrigin.X;
+      Top := VerticalFix;
+      Right := HorizontalFix;
+      Bottom := Y + FClickOrigin.Y;
+      FFormDesigner.UpdateRect(Rect, [dLeft, dBottom]);
     end;
-  end;
-end;
-
-procedure TUpLeftDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
-var
-  Rect: TRect;
-  ChildRect: TRect;
-begin
-  Rect := FFormDesigner.GetRect();
-  ChildRect := FFormDesigner.GetChildRect();
-  with Rect do
-  begin
-    if (X < ChildRect.Left + ChildRect.Width) and (Y < ChildRect.Top + ChildRect.Height)
-    then
+    if (X > HorizontalFix) and (Y < VerticalFix) then
     begin
-      Rect.Left := X + FClickOrigin.X;
-      Rect.Bottom := ChildRect.Top + ChildRect.Height;
-      Rect.Top := Y + FClickOrigin.Y;
-      Rect.Right := ChildRect.Left + ChildRect.Width;
+      Left := HorizontalFix;
+      Top := Y + FClickOrigin.Y;
+      Right := X + FClickOrigin.X;
+      Bottom := VerticalFix;
+      FFormDesigner.UpdateRect(Rect, [dRight, dTop]);
     end;
-    if (X > ChildRect.Left + ChildRect.Width) and (Y < ChildRect.Top + ChildRect.Height)
-    then
+    if (X < HorizontalFix) and (Y < VerticalFix) then
     begin
-      Rect.Top := Y + FClickOrigin.Y;
-      Rect.Bottom := ChildRect.Top + ChildRect.Height;
-      Rect.Left := ChildRect.Left + ChildRect.Width;
-      Rect.Right := X + FClickOrigin.X;
+      Left := X + FClickOrigin.X;
+      Top := Y + FClickOrigin.Y;
+      Right := HorizontalFix;
+      Bottom := VerticalFix;
+      FFormDesigner.UpdateRect(Rect, [dLeft, dTop]);
     end;
-    if (X < ChildRect.Left + ChildRect.Width) and (Y > ChildRect.Top + ChildRect.Height)
-    then
-    begin
-      Rect.Top := ChildRect.Top + ChildRect.Height;
-      Rect.Bottom := Y + FClickOrigin.Y;
-      Rect.Left := X + FClickOrigin.X;
-      Rect.Right := ChildRect.Left + ChildRect.Width;
-    end;
-    if (X > ChildRect.Left + ChildRect.Width) and (Y > ChildRect.Top + ChildRect.Height)
-    then
-    begin
-      Rect.Top := ChildRect.Top + ChildRect.Height;
-      Rect.Bottom := Y + FClickOrigin.Y;
-      Rect.Left := ChildRect.Left + ChildRect.Width;
-      Rect.Right := X + FClickOrigin.X;
-    end;
-    FFormDesigner.UpdateRect(Rect, dUpLeft);
-  end;
-end;
-
-procedure TUpRightDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
-var
-  Rect: TRect;
-  ChildRect: TRect;
-begin
-  Rect := FFormDesigner.GetRect();
-  ChildRect := FFormDesigner.GetChildRect();
-  with Rect do
-  begin
-    if (X > ChildRect.Left) and (Y < ChildRect.Top + ChildRect.Height) then
-    begin
-      Rect.Left := ChildRect.Left;
-      Rect.Bottom := ChildRect.Top + ChildRect.Height;
-      Rect.Top := Y + FClickOrigin.Y;
-      Rect.Right := X + FClickOrigin.X;
-    end;
-    if (X < ChildRect.Left) and (Y < ChildRect.Top + ChildRect.Height) then
-    begin
-      Rect.Top := Y + FClickOrigin.Y;
-      Rect.Bottom := ChildRect.Top + ChildRect.Height;
-      Rect.Left := X + FClickOrigin.X;
-      Rect.Right := ChildRect.Left;
-    end;
-    if (X > ChildRect.Left) and (Y > ChildRect.Top + ChildRect.Height) then
-    begin
-      Rect.Top := ChildRect.Top + ChildRect.Height;
-      Rect.Bottom := Y + FClickOrigin.Y;
-      Rect.Left := ChildRect.Left;
-      Rect.Right := X + FClickOrigin.X;
-    end;
-    if (X < ChildRect.Left) and (Y > ChildRect.Top + ChildRect.Height) then
-    begin
-      Rect.Top := ChildRect.Top + ChildRect.Height;
-      Rect.Bottom := Y + FClickOrigin.Y;
-      Rect.Left := X + FClickOrigin.X;
-      Rect.Right := ChildRect.Left;
-    end;
-    FFormDesigner.UpdateRect(Rect, dUpRight);
-  end;
-end;
-
-procedure TDownLeftDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
-var
-  Rect: TRect;
-  ChildRect: TRect;
-begin
-  Rect := FFormDesigner.GetRect();
-  ChildRect := FFormDesigner.GetChildRect();
-  with Rect do
-  begin
-    if (X < ChildRect.Left + ChildRect.Width) and (Y > ChildRect.Top) then
-    begin
-      Rect.Left := X + FClickOrigin.X;
-      Rect.Bottom := Y + FClickOrigin.Y;
-      Rect.Top := ChildRect.Top;
-      Rect.Right := ChildRect.Left + ChildRect.Width;
-    end;
-    if (X > ChildRect.Left + ChildRect.Width) and (Y < ChildRect.Top) then
-    begin
-      Rect.Top := Y + FClickOrigin.Y;
-      Rect.Bottom := ChildRect.Top;
-      Rect.Left := ChildRect.Left + ChildRect.Width;
-      Rect.Right := X + FClickOrigin.X;
-    end;
-    if (X < ChildRect.Left + ChildRect.Width) and (Y < ChildRect.Top) then
-    begin
-      Rect.Top := Y + FClickOrigin.Y;
-      Rect.Bottom := ChildRect.Top;
-      Rect.Left := X + FClickOrigin.X;
-      Rect.Right := ChildRect.Left + ChildRect.Width;
-    end;
-    if (X > ChildRect.Left + ChildRect.Width) and (Y > ChildRect.Top) then
-    begin
-      Rect.Top := ChildRect.Top;
-      Rect.Bottom := Y + FClickOrigin.Y;
-      Rect.Left := ChildRect.Left + ChildRect.Width;
-      Rect.Right := X + FClickOrigin.X;
-    end;
-    FFormDesigner.UpdateRect(Rect, dDownLeft);
-  end;
-end;
-
-procedure TDownRightDragHandle.MouseMoveHandler(Sender: TControl; X, Y: integer);
-var
-  Rect: TRect;
-  ChildRect: TRect;
-begin
-  Rect := FFormDesigner.GetRect();
-  ChildRect := FFormDesigner.GetChildRect();
-  with Rect do  begin
-    if (X > ChildRect.Left) and (Y > ChildRect.Top) then
-    begin
-      Rect.Left := ChildRect.Left;
-      Rect.Bottom := Y + FClickOrigin.Y;
-      Rect.Top := ChildRect.Top;
-      Rect.Right := X + FClickOrigin.X;
-    end;
-    if (X < ChildRect.Left) and (Y > ChildRect.Top) then
-    begin
-      Rect.Top := ChildRect.Top;
-      Rect.Bottom := Y + FClickOrigin.Y;
-      Rect.Left := X + FClickOrigin.X;
-      Rect.Right := ChildRect.Left;
-    end;
-    if (X < ChildRect.Left) and (Y < ChildRect.Top) then
-    begin
-      Rect.Top := Y + FClickOrigin.Y;
-      Rect.Bottom := ChildRect.Top;
-      Rect.Left := X + FClickOrigin.X;
-      Rect.Right := ChildRect.Left;
-    end;
-    if (X > ChildRect.Left) and (Y < ChildRect.Top) then
-    begin
-      Rect.Top := Y + FClickOrigin.Y;
-      Rect.Bottom := ChildRect.Top;
-      Rect.Left := ChildRect.Left;
-      Rect.Right := X + FClickOrigin.X;
-    end;
-    FFormDesigner.UpdateRect(Rect, dDownRight);
   end;
 end;
 
