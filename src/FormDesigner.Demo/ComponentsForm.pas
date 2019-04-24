@@ -29,7 +29,7 @@ uses
 const
   ControlClasses: array[0..12] of TControlClass =
     (TButton, TLabel, TEdit, TCheckBox, TRadioButton, TMemo, TComboBox,
-    TListBox, TProgressBar, TTrackBar, TGroupBox, TPanel, TRadioGroup);
+    TListBox, TProgressBar, TGroupBox, TPanel, TRadioGroup, TShape);
 
 procedure TfrmComponentsForm.FormCreate(Sender: TObject);
 var
