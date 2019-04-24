@@ -3,7 +3,7 @@ unit DesignForm;
 interface
 
 uses System.Classes, System.SysUtils, Vcl.Controls, Vcl.Forms, Vcl.ComCtrls,
-  FormDesigner.Designer, ComponentsForm, Vcl.ToolWin, Utils;
+  FormDesigner.Designer, ComponentsForm, Vcl.ToolWin, Utils, Vcl.StdCtrls;
 
 type
   TfrmDesignForm = class(TForm)
