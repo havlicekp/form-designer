@@ -1,7 +1,7 @@
 object frmDesignForm: TfrmDesignForm
   Left = 0
   Top = 0
-  Caption = 'frmDesignForm'
+  Caption = 'Form Designer'
   ClientHeight = 336
   ClientWidth = 635
   Color = clBtnFace
@@ -16,6 +16,7 @@ object frmDesignForm: TfrmDesignForm
   PixelsPerInch = 96
   TextHeight = 13
   object fdDesigner: TFormDesigner
+    ShowHints = True
     OnControlAdded = fdDesignerControlAdded
     OnControlSelected = fdDesignerEvent
     OnControlModified = fdDesignerEvent
