@@ -12,17 +12,20 @@ The repository contains both the TFormDesigner component and Demo project.
 2. Right-click on the FormDesigner.Package.dproj and choose **Install**
 3. **Form Designer** tab will appear on your Component Toolbar 
 
+:point_right: TFormDesigner was tested only under Windows 10 and Embarcadero® Delphi 10.3 Community Edition
+
 ## Usage
 
 1. Drop the the **TFormDesigner** component onto a form
 2. Customize component's self-explanatory properties like DragHandleColor, DrawGrid or SnapToGrid
 3. During runtime call ``AddControl`` methods to instruct TFormDesigner which controls should be possible to move/re-size. There are two versions of ``AddControl``. 
- * The first one works with controls already present on a form:
-  ```pascal
+  
+   * The first one works with controls already present on a form:
+   ```pascal
   frmDesignForm.fdDesigner.AddControl(btnButton1);
   ```
-  * The second version accepts class name (TClass) of a control to be created dynamically. The control is created when mouse is clicked on a form or mouse is dragged specifying new control dimensions.
+  
+   * The second version accepts class name (TClass) of a control to be created dynamically. The control is created when mouse is clicked on a form or mouse is dragged around specifying new control dimensions.
   ```pascal
   frmDesignForm.fdDesigner.AddControl(TButton);
   ```
-
