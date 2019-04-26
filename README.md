@@ -17,12 +17,12 @@ The repository contains both the TFormDesigner component and Demo project.
 1. Drop the the **TFormDesigner** component onto a form
 2. Customize component's self-explanatory properties like DragHandleColor, DrawGrid or SnapToGrid
 3. During runtime call ``AddControl`` methods to instruct TFormDesigner which controls should be possible to move/re-size. There are two versions of ``AddControl``. 
-* The first one works with controls already present on a form:
-'''pascal
-frmDesignForm.fdDesigner.AddControl(btnButton1);
-'''
-* The second version accepts class name (TClass) of a control to be created dynamically. The control is created when mouse is clicked on a form or mouse is dragged specifying new control dimensions.
-'''pascal
-frmDesignForm.fdDesigner.AddControl(TButton);
-'''
+ * The first one works with controls already present on a form:
+  ```pascal
+  frmDesignForm.fdDesigner.AddControl(btnButton1);
+  ```
+  * The second version accepts class name (TClass) of a control to be created dynamically. The control is created when mouse is clicked on a form or mouse is dragged specifying new control dimensions.
+  ```pascal
+  frmDesignForm.fdDesigner.AddControl(TButton);
+  ```
 
