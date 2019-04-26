@@ -7,7 +7,7 @@ uses Classes, Controls, Graphics, Windows, Messages, Forms, SysUtils, StdCtrls,
 
 type
 
-  TFormDesignerState = (ssReady, ssMoving, ssSizing);
+  TFormDesignerState = (fdsReady, fdsMoving, fdsSizing);
   TDirection = (dBottom, dTop, dLeft, dRight);
   TDirections = set of TDirection;
 

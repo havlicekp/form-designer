@@ -24,7 +24,7 @@ type
     property BorderColor : TColor read FBorderColor write FBorderColor;
     property FormDesigner: IFormDesigner read FFormDesigner write FFormDesigner;
     property Size: Byte read FSize write SetSize;
-    procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); virtual; abstract;
+    procedure UpdateChildSize(Sender: TControl; X, Y: Integer); virtual; abstract;
     procedure SetSizingOrigin(const X, Y: Integer);
     procedure UpdatePosition(Control: TControl); virtual; abstract;
     procedure Paint; override;
@@ -32,15 +32,15 @@ type
   end;
 
   THorizontalDragHandle = class(TDragHandle)
-    procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); override;
+    procedure UpdateChildSize(Sender: TControl; X, Y: Integer); override;
   end;
 
   TVerticalDragHandle = class(TDragHandle)
-    procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); override;
+    procedure UpdateChildSize(Sender: TControl; X, Y: Integer); override;
   end;
 
   TMultiDirectionalDragHandle = class(TDragHandle)
-    procedure MouseMoveHandler(Sender: TControl; X, Y: Integer); override;
+    procedure UpdateChildSize(Sender: TControl; X, Y: Integer); override;
   end;
 
   TUpDragHandle = class(TVerticalDragHandle)
@@ -252,7 +252,7 @@ begin
   Top := Control.Top + Control.Height - (Height div 2);
 end;
 
-procedure TVerticalDragHandle.MouseMoveHandler(Sender: TControl; X, Y: Integer);
+procedure TVerticalDragHandle.UpdateChildSize(Sender: TControl; X, Y: Integer);
 var
   DragRect: TRect;
   ChildRect: TRect;
@@ -281,7 +281,7 @@ begin
   end;
 end;
 
-procedure THorizontalDragHandle.MouseMoveHandler(Sender: TControl; X: Integer; Y: Integer);
+procedure THorizontalDragHandle.UpdateChildSize(Sender: TControl; X: Integer; Y: Integer);
 var
   DragRect: TRect;
   ChildRect: TRect;
@@ -310,7 +310,7 @@ begin
   end;
 end;
 
-procedure TMultiDirectionalDragHandle.MouseMoveHandler(Sender: TControl; X, Y: Integer);
+procedure TMultiDirectionalDragHandle.UpdateChildSize(Sender: TControl; X, Y: Integer);
 var
   DragRect: TRect;
   ChildRect: TRect;
