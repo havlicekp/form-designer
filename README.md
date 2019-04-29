@@ -2,7 +2,7 @@
 
 ![Demo](https://github.com/havlicekp/form-designer/blob/master/images/demo.gif)
 
-Form Designer can be used to design and modify Delphi (VCL) forms at runtime. The behavior and appearance is very similar to Form Designer available in Delphi IDE. 
+Form Designer (TFormDesigner) can be used to design and modify Delphi (VCL) forms at runtime. The behavior and appearance is  similar to that of Delphi IDE. 
 
 The repository contains both the TFormDesigner component and Demo project.
 
