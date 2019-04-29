@@ -31,7 +31,7 @@ type
   TRectModifiers = class;
 
   TFormDesigner = class(TComponent, IFormDesigner)
-  private
+  strict private
     FParent: TWinControl;
     FChild: TControl;
     FDragHandleSize: Byte;
@@ -72,21 +72,16 @@ type
     FOnControlAdded: TNotifyEvent;
     FDragHandleBorderColor: TColor;
     FEnabled: Boolean;
-    procedure ControlSelected;
-    procedure ControlModified;
-    procedure ControlAdded;
     procedure SetEnabled(const Value: Boolean);
     procedure SetShowHints(const Value: Boolean);
-    function TryGetParent(const HWnd: HWnd; pt: TPoint;
-      var Control: TControl): Boolean;
-    function FindControl(Handle: HWnd): TControl;
+    procedure SetChild(const Value: TControl);
+    procedure SetDragHandleSize(const Value: Byte);
+    procedure SetDragHandlesVisible(const Value: Boolean);
+    procedure SetDragHandleColor(const Value: TColor);
+    procedure SetGridGap(const Value: Integer);
+    procedure SetDrawGrid(const Value: Boolean);
+    procedure SetDragHandleBorderColor(const Value: TColor);
     procedure CancelSizeMove(WindowHandle: HWnd);
-    procedure SetChild(Value: TControl);
-    procedure SetDragHandleSize(Value: Byte);
-    procedure SetDragHandlesVisible(Value: Boolean);
-    procedure SetDragHandleColor(Value: TColor);
-    procedure SetGridGap(Value: integer);
-    procedure SetDrawGrid(Value: Boolean);
     procedure ClipCursor;
     procedure UpdateDragHandles;
     procedure MessageReceivedHandler(var msg: tagMSG; var Handled: Boolean);
@@ -98,6 +93,9 @@ type
     function AlignToGrid(Num: integer; Offset: integer = 0): integer;
     procedure MouseUpHandler(var msg: tagMSG; ApplyChanges: Boolean);
     procedure UpdateChildPos(Sender: TControl; X, Y: integer);
+    function TryGetParent(const HWnd: HWnd; pt: TPoint;
+      var Control: TControl): Boolean;
+    function FindControl(const Handle: HWnd): TControl;
     procedure MouseMoveHandler(var msg: tagMSG);
     procedure StartMoving(Sender: TControl; X, Y: integer);
     procedure KeyDownHandler(var msg: tagMSG);
@@ -107,14 +105,16 @@ type
       write SetDragHandlesVisible;
     property Child: TControl read FChild write SetChild;
     procedure SetupControlToAdd(var pt: TPoint; Control: TControl);
-    procedure SetDragHandleBorderColor(const Value: TColor);
     procedure MouseDownHandler(var msg: tagMSG);
     procedure SetCursor(CtrlInfo: TControlInfo);
     procedure RestoreCursor(CtrlInfo: TControlInfo);
+    procedure ControlSelected;
+    procedure ControlModified;
+    procedure ControlAdded;
   public
     function GetDragRect: TRect;
     function GetChildRect: TRect;
-    procedure UpdateRect(Rect: TRect; Directions: TDirections);
+    procedure UpdateDragRect(Rect: TRect; Directions: TDirections);
     procedure AddControl(ControlClass: TControlClass); overload;
     procedure AddControl(AControl: TControl); overload;
     procedure RemoveControl(Control: TControl);
@@ -179,7 +179,7 @@ type
 
   /// Inflates TRect by a specified number of pixels
   TInflatingRectModifier = class(TRectModifierBase)
-  private
+  strict private
     FInflateBy: integer;
   public
     constructor Create(InflateBy: integer);
@@ -187,7 +187,7 @@ type
   end;
 
   TRectModifiers = class
-  private
+  strict private
     FRectModifiers: TObjectDictionary<TControlClass, TRectModifier>;
     FDefaultRectModifier: TRectModifier;
   public
@@ -799,7 +799,7 @@ begin
   end;
 end;
 
-procedure TFormDesigner.SetChild(Value: TControl);
+procedure TFormDesigner.SetChild(const Value: TControl);
 begin
   FChild := Value;
   if Assigned(FChild) then
@@ -834,7 +834,7 @@ begin
     end);
 end;
 
-procedure TFormDesigner.UpdateRect(Rect: TRect; Directions: TDirections);
+procedure TFormDesigner.UpdateDragRect(Rect: TRect; Directions: TDirections);
 begin
   FDragRect := Rect;
   if FSnapToGrid then
@@ -888,7 +888,7 @@ begin
     end);
 end;
 
-procedure TFormDesigner.SetDragHandleColor(Value: TColor);
+procedure TFormDesigner.SetDragHandleColor(const Value: TColor);
 begin
   FDragHandleColor := Value;
   ForEachDragHandle(
@@ -898,7 +898,7 @@ begin
     end);
 end;
 
-procedure TFormDesigner.SetDrawGrid(Value: Boolean);
+procedure TFormDesigner.SetDrawGrid(const Value: Boolean);
 begin
   if FDrawGrid <> Value then
   begin
@@ -962,7 +962,7 @@ begin
   end;
 end;
 
-procedure TFormDesigner.SetDragHandleSize(Value: Byte);
+procedure TFormDesigner.SetDragHandleSize(const Value: Byte);
 begin
   FDragHandleSize := Value;
   ForEachDragHandle(
@@ -973,7 +973,7 @@ begin
     end);
 end;
 
-procedure TFormDesigner.SetDragHandlesVisible(Value: Boolean);
+procedure TFormDesigner.SetDragHandlesVisible(const Value: Boolean);
 begin
   FDragHandlesVisible := Value;
   ForEachDragHandle(
@@ -1012,7 +1012,7 @@ begin
   raise TFormDesignerException.Create('Unknow DragHandle Type');
 end;
 
-procedure TFormDesigner.SetGridGap(Value: integer);
+procedure TFormDesigner.SetGridGap(const Value: integer);
 begin
   FGridGap := Value;
   FForm.Refresh;
@@ -1040,7 +1040,7 @@ begin
     end;
 end;
 
-function TFormDesigner.FindControl(Handle: HWnd): TControl;
+function TFormDesigner.FindControl(const Handle: HWnd): TControl;
 begin
   Result := Vcl.Controls.FindControl(Handle);
   if not Assigned(Result) then

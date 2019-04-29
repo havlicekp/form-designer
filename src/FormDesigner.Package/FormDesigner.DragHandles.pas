@@ -10,7 +10,7 @@ type
 
   /// Base class for drag handles
   TDragHandle = class(TCustomControl)
-  private
+  protected
     FClickOrigin: TPoint;
     FHorizontalFix: TDirection;
     FVerticalFix: TDirection;
@@ -92,10 +92,6 @@ type
   end;
 
 implementation
-
-// ----------------------------------------------------------
-// TDragHandles
-// ----------------------------------------------------------
 
 constructor TDragHandle.Create;
 begin
@@ -269,13 +265,13 @@ begin
       begin
         Top := VerticalFix;
         Bottom := Y + FClickOrigin.Y;
-        FFormDesigner.UpdateRect(DragRect, [dBottom]);
+        FFormDesigner.UpdateDragRect(DragRect, [dBottom]);
       end
       else
       begin
         Top := Y + FClickOrigin.Y;
         Bottom := VerticalFix;
-        FFormDesigner.UpdateRect(DragRect, [dTop]);
+        FFormDesigner.UpdateDragRect(DragRect, [dTop]);
       end;
     end;
   end;
@@ -298,13 +294,13 @@ begin
       begin
         Left := HorizontalFix;
         Right := X + FClickOrigin.X;
-        FFormDesigner.UpdateRect(DragRect, [dRight]);
+        FFormDesigner.UpdateDragRect(DragRect, [dRight]);
       end
       else
       begin
         Left := X + FClickOrigin.X;
         Right := HorizontalFix;
-        FFormDesigner.UpdateRect(DragRect, [dLeft]);
+        FFormDesigner.UpdateDragRect(DragRect, [dLeft]);
       end;
     end;
   end;
@@ -328,7 +324,7 @@ begin
       Top := VerticalFix;
       Right := X + FClickOrigin.X;
       Bottom := Y + FClickOrigin.Y;
-      FFormDesigner.UpdateRect(DragRect, [dRight, dBottom]);
+      FFormDesigner.UpdateDragRect(DragRect, [dRight, dBottom]);
     end;
     if (X < HorizontalFix) and (Y > VerticalFix) then
     begin
@@ -336,7 +332,7 @@ begin
       Top := VerticalFix;
       Right := HorizontalFix;
       Bottom := Y + FClickOrigin.Y;
-      FFormDesigner.UpdateRect(DragRect, [dLeft, dBottom]);
+      FFormDesigner.UpdateDragRect(DragRect, [dLeft, dBottom]);
     end;
     if (X > HorizontalFix) and (Y < VerticalFix) then
     begin
@@ -344,7 +340,7 @@ begin
       Top := Y + FClickOrigin.Y;
       Right := X + FClickOrigin.X;
       Bottom := VerticalFix;
-      FFormDesigner.UpdateRect(DragRect, [dRight, dTop]);
+      FFormDesigner.UpdateDragRect(DragRect, [dRight, dTop]);
     end;
     if (X < HorizontalFix) and (Y < VerticalFix) then
     begin
@@ -352,7 +348,7 @@ begin
       Top := Y + FClickOrigin.Y;
       Right := HorizontalFix;
       Bottom := VerticalFix;
-      FFormDesigner.UpdateRect(DragRect, [dLeft, dTop]);
+      FFormDesigner.UpdateDragRect(DragRect, [dLeft, dTop]);
     end;
   end;
 end;

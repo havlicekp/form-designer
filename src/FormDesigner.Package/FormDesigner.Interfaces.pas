@@ -14,7 +14,7 @@ type
   IFormDesigner = interface
     function GetDragRect : TRect;
     function GetChildRect : TRect;
-    procedure UpdateRect(Rect: TRect; Direction: TDirections);
+    procedure UpdateDragRect(Rect: TRect; Direction: TDirections);
   end;
 
 implementation

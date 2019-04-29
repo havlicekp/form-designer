@@ -4,48 +4,45 @@ interface
 
 uses Classes, Controls, Windows, SysUtils, IOUtils, WinApi.Messages;
 
-
 type
 
-TEnumChildsProc = reference to procedure(Control: TControl);
+  TEnumChildsProc = reference to procedure(Control: TControl);
 
-{ TQueue }
+  TQueue = class
+  strict private
+    FList: TList;
+    FMax: Longint;
+    function GetCount: Longint;
+  public
+    function Get: Longint;
+    procedure Add(Value: Longint);
+    constructor Create(Max: Longint);
+    destructor Destroy; override;
+    property Count: Longint read GetCount;
+   end;
 
-TQueue = class
-private
-  FList: TList;
-  FMax: Longint;
-  function GetCount: Longint;
-public
-  function Get: Longint;
-  procedure Add(Value: Longint);
-  constructor Create(Max: Longint);
-  destructor Destroy; override;
-  property Count: Longint read GetCount;
- end;
+  TRectHelper = record helper for TRect
+    function ClientToScreen(Window: TWinControl) : TRect;
+  end;
 
-TRectHelper = record helper for TRect
-  function ClientToScreen(Window: TWinControl) : TRect;
-end;
+  TWinControlHelder = class helper for TWinControl
+    procedure RemoveWindowStyle(Style: Integer);
+  end;
 
-TWinControlHelder = class helper for TWinControl
-  procedure RemoveWindowStyle(Style: Integer);
-end;
+  function GET_X_LPARAM(lParam: lParam): Integer;
+  function GET_Y_LPARAM(lParam: lParam): Integer;
+  function MAKEPOINT(lParam: lParam) : TPoint;
+  function GetControlName(Parent: TWinControl; Cls: TClass): String;
+  function GetMessageName(Msg: Cardinal) : String;
+  procedure Log(msg: string); overload;
+  procedure Log(const source, msg: string; const Rect: TRect); overload;
+  procedure Log(const source: string; const message: string); overload;
+  procedure Log(const Format: string; const Args: array of const); overload;
+  procedure Log(const source: string; const Format: string; const Args: array of const); overload;
 
-function GET_X_LPARAM(lParam: lParam): Integer;
-function GET_Y_LPARAM(lParam: lParam): Integer;
-function MAKEPOINT(lParam: lParam) : TPoint;
-function GetControlName(Parent: TWinControl; Cls: TClass): String;
-function GetMessageName(Msg: Cardinal) : String;
-procedure Log(msg: string); overload;
-procedure Log(const source, msg: string; const Rect: TRect); overload;
-procedure Log(const source: string; const message: string); overload;
-procedure Log(const Format: string; const Args: array of const); overload;
-procedure Log(const source: string; const Format: string; const Args: array of const); overload;
-
-procedure EnumChilds(RootCtrl: TWinControl; Proc: TEnumChildsProc);
-procedure SetControlText(Control: TControl; Text: String);
-function IsMessageForWindow(MsgHandle: HWnd; WindowHandle: HWnd) : Boolean;
+  procedure EnumChilds(RootCtrl: TWinControl; Proc: TEnumChildsProc);
+  procedure SetControlText(Control: TControl; Text: String);
+  function IsMessageForWindow(MsgHandle: HWnd; WindowHandle: HWnd) : Boolean;
 
 implementation
 
@@ -159,6 +156,26 @@ begin
   end;
 end;
 
+procedure SetControlText(Control: TControl; Text: String);
+begin
+  Control.Perform(WM_SETTEXT, NativeInt(0), NativeInt(PChar(Text)));
+end;
+
+function IsMessageForWindow(MsgHandle: HWnd; WindowHandle: HWnd) : Boolean;
+var
+  Parent: HWnd;
+begin
+  if MsgHandle = WindowHandle then
+  begin
+    Result := True;
+  end
+  else
+  begin
+    Parent := GetAncestor(MsgHandle, GA_ROOT);
+    Result := (Parent <> 0) and (Parent = WindowHandle);
+  end;
+end;
+
 
 // -----------------------------------------------------------------
 // Logging
@@ -207,26 +224,6 @@ var
 begin
   msg := source + ' ' + System.SysUtils.Format(Format, Args);
   Log(msg);
-end;
-
-procedure SetControlText(Control: TControl; Text: String);
-begin
-  Control.Perform(WM_SETTEXT, NativeInt(0), NativeInt(PChar(Text)));
-end;
-
-function IsMessageForWindow(MsgHandle: HWnd; WindowHandle: HWnd) : Boolean;
-var
-  Parent: HWnd;
-begin
-  if MsgHandle = WindowHandle then
-  begin
-    Result := True;
-  end
-  else
-  begin
-    Parent := GetAncestor(MsgHandle, GA_ROOT);
-    Result := (Parent <> 0) and (Parent = WindowHandle);
-  end;
 end;
 
 end.
