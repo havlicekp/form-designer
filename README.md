@@ -25,7 +25,7 @@ The repository contains both the TFormDesigner component and Demo project.
   
    * The second version accepts class of a control (TControlClass) to be created dynamically. The control will be created by user action, either by a mouse click on a form hosting the TFormDesigner or by dragging a mouse around thus specifying new control dimensions.
    ```pascal
-   procedure TFormDesigner.AddControl(ControlClass: TControlClass); overload 
+   procedure AddControl(ControlClass: TControlClass); overload 
    ```
 4. Set ``Enabled`` to False to take away TFormDesigner's reign over the hosting TForm and its controls.
 
