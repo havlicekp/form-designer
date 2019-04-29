@@ -71,11 +71,13 @@ type
     FOnControlModified: TNotifyEvent;
     FOnControlAdded: TNotifyEvent;
     FDragHandleBorderColor: TColor;
+    FEnabled: Boolean;
     procedure ControlSelected;
     procedure ControlModified;
     procedure ControlAdded;
-    procedure SetShowHints(Value: Boolean);
-    function TryGetParent(HWnd: HWnd; pt: TPoint;
+    procedure SetEnabled(const Value: Boolean);
+    procedure SetShowHints(const Value: Boolean);
+    function TryGetParent(const HWnd: HWnd; pt: TPoint;
       var Control: TControl): Boolean;
     function FindControl(Handle: HWnd): TControl;
     procedure CancelSizeMove(WindowHandle: HWnd);
@@ -107,6 +109,8 @@ type
     procedure SetupControlToAdd(var pt: TPoint; Control: TControl);
     procedure SetDragHandleBorderColor(const Value: TColor);
     procedure MouseDownHandler(var msg: tagMSG);
+    procedure SetCursor(CtrlInfo: TControlInfo);
+    procedure RestoreCursor(CtrlInfo: TControlInfo);
   public
     function GetDragRect: TRect;
     function GetChildRect: TRect;
@@ -117,6 +121,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
   published
+    property Enabled: Boolean read FEnabled write SetEnabled default True;
     property DragHandleSize: Byte read FDragHandleSize write SetDragHandleSize
       default 8;
     property DragHandleBorderColor: TColor read FDragHandleBorderColor
@@ -145,6 +150,7 @@ type
   public
     FormDesigner: TFormDesigner;
     Control: TControl;
+    PrevCursor: TCursor;
 
     /// Used to replace Window procedure for Delphi controls
     PrevWndMethod: TWndMethod;
@@ -212,26 +218,26 @@ end;
 // Window procedure for controls managed by Delphi
 procedure TControlInfo.ControlWindowProc(var msg: TMessage);
 begin
-  if IsAllowedMessage(msg.msg) then
+  if not FormDesigner.Enabled or IsAllowedMessage(msg.msg) then
     PrevWndMethod(msg);
 end;
 
 // Windows procedure for controls not managed by Delphi, like EDIT inside a
 // TComboBox. It is set by using SetWindowLong. In this case instance
 // methods can't be used.
+// If Form Designer is enabled, set arrow as a cursor.
 function ComboEditWindowProcedure(Wnd: HWnd; msg: Cardinal; wParam: wParam;
   lParam: lParam): LResult; stdcall;
 var
   ControlInfo: TControlInfo;
 begin
-  if IsAllowedMessage(msg) then
-  begin
-    ControlInfo := TControlInfo(GetProp(Wnd, 'TControlInfo'));
+  Result := 0;
+  ControlInfo := TControlInfo(GetProp(Wnd, 'TControlInfo'));
+  if (msg = WM_SETCURSOR) and ControlInfo.FormDesigner.Enabled then
+    SetCursor(LoadCursor(0, IDC_ARROW))
+  else if not ControlInfo.FormDesigner.Enabled or IsAllowedMessage(msg) then
     Result := CallWindowProc(Addr(ControlInfo.PrevWindowProc), Wnd, msg,
       wParam, lParam);
-  end
-  else
-    Result := 0;
 end;
 
 
@@ -260,6 +266,7 @@ begin
   FGridGap := 8;
   FSnapToGrid := True;
   FDragMode := dmDeferred;
+  FEnabled := True;
   DrawGrid := True;
 
   for DragHandleClass in DragHandleClasses do
@@ -307,18 +314,21 @@ end;
 procedure TFormDesigner.MessageReceivedHandler(var msg: tagMSG;
   var Handled: Boolean);
 begin
-  case msg.message of
-    WM_MOUSEMOVE:
-      MouseMoveHandler(msg);
+  if (FEnabled) then
+  begin
+    case msg.message of
+      WM_MOUSEMOVE:
+        MouseMoveHandler(msg);
 
-    WM_LBUTTONDOWN:
-      MouseDownHandler(msg);
+      WM_LBUTTONDOWN:
+        MouseDownHandler(msg);
 
-    WM_LBUTTONUP:
-      MouseUpHandler(msg, True);
+      WM_LBUTTONUP:
+        MouseUpHandler(msg, True);
 
-    WM_KEYDOWN:
-      KeyDownHandler(msg);
+      WM_KEYDOWN:
+        KeyDownHandler(msg);
+    end;
   end;
 end;
 
@@ -400,7 +410,8 @@ var
   Shift: TShiftState;
   Key: Word;
 
-  procedure UpdateChildProp(CtrlPropName, ShiftPropName: String; Value: integer);
+  procedure UpdateChildProp(CtrlPropName, ShiftPropName: String;
+    Value: integer);
   var
     PropValue: integer;
   begin
@@ -670,21 +681,20 @@ begin
     FormDesigner := Self;
     PrevWndMethod := Control.WindowProc;
     Control.WindowProc := ControlWindowProc;
+    SetCursor(ControlInfo);
     if (AControl is TComboBox) then
     begin
       EditWnd := GetWindow(TComboBox(Control).Handle, GW_CHILD);
-      SetClassLong(EditWnd, GCL_HCURSOR, LoadCursor(0, IDC_ARROW));
       SetProp(EditWnd, 'TControlInfo', DWORD(ControlInfo));
       @PrevWindowProc := Pointer(SetWindowLong(EditWnd, GWL_WNDPROC,
         Longint(@ComboEditWindowProcedure)));
     end;
-  end;
-  if AControl is TWinControl then
-  begin
-    TWinControl(AControl).RemoveWindowStyle(WS_CLIPCHILDREN);
+    if Control is TWinControl then
+    begin
+      TWinControl(AControl).RemoveWindowStyle(WS_CLIPCHILDREN);
+    end;
   end;
   FControls.Add(ControlInfo);
-  AControl.Cursor := crArrow;
 end;
 
 procedure TFormDesigner.RemoveControl(Control: TControl);
@@ -739,7 +749,7 @@ var
   Control, Child: TControl;
   CursorPos: TPoint;
 begin
-  if FState = fdsReady then
+  if FEnabled and (FState = fdsReady) then
   begin
     ms := System.DateUtils.MilliSecondsBetween(Now, FLastMouseMove);
     if ms > 50 then
@@ -775,15 +785,18 @@ procedure TFormDesigner.FormPaintHandler;
 var
   i, j: integer;
 begin
-  for i := 0 to FForm.Height - 1 do
+  if FEnabled then
   begin
-    if (i mod FGridGap) = 0 then
-      for j := 0 to FForm.Width - 1 do
-        if (j mod FGridGap) = 0 then
-          FForm.Canvas.Pixels[j, i] := clBlack;
+    for i := 0 to FForm.Height - 1 do
+    begin
+      if (i mod FGridGap) = 0 then
+        for j := 0 to FForm.Width - 1 do
+          if (j mod FGridGap) = 0 then
+            FForm.Canvas.Pixels[j, i] := clBlack;
+    end;
+    if Assigned(FFormOnPaint) then
+      FFormOnPaint(Self);
   end;
-  if Assigned(FFormOnPaint) then
-    FFormOnPaint(Self);
 end;
 
 procedure TFormDesigner.SetChild(Value: TControl);
@@ -845,7 +858,7 @@ begin
     DrawRect;
 end;
 
-function TFormDesigner.TryGetParent(HWnd: HWnd; pt: TPoint;
+function TFormDesigner.TryGetParent(const HWnd: HWnd; pt: TPoint;
 var Control: TControl): Boolean;
 var
   ClsName: array [0 .. 5] of char;
@@ -910,6 +923,45 @@ begin
   end;
 end;
 
+procedure TFormDesigner.SetCursor(CtrlInfo: TControlInfo);
+var
+  EditWnd: HWnd;
+begin
+  with CtrlInfo do
+  begin
+    PrevCursor := Control.Cursor;
+    Control.Cursor := crArrow;
+  end;
+end;
+
+procedure TFormDesigner.RestoreCursor(CtrlInfo: TControlInfo);
+begin
+  CtrlInfo.Control.Cursor := CtrlInfo.PrevCursor;
+end;
+
+procedure TFormDesigner.SetEnabled(const Value: Boolean);
+var
+  CtrlInfo: TControlInfo;
+begin
+  if FEnabled <> Value then
+  begin
+    FEnabled := Value;
+    if not FEnabled then
+    begin
+      Child := nil;
+      DragHandlesVisible := False;
+      for CtrlInfo in FControls do
+        RestoreCursor(CtrlInfo);
+    end
+    else
+    begin
+      for CtrlInfo in FControls do
+        SetCursor(CtrlInfo);
+    end;
+    FForm.Refresh;
+  end;
+end;
+
 procedure TFormDesigner.SetDragHandleSize(Value: Byte);
 begin
   FDragHandleSize := Value;
@@ -966,7 +1018,7 @@ begin
   FForm.Refresh;
 end;
 
-procedure TFormDesigner.SetShowHints(Value: Boolean);
+procedure TFormDesigner.SetShowHints(const Value: Boolean);
 begin
   FShowHints := Value;
   if not(csDesigning in ComponentState) then
