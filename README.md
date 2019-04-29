@@ -8,7 +8,7 @@ The repository contains both the TFormDesigner component and Demo project.
 
 ## Installation
 
-1. Download or fork the repository and open grouped project ``src\FormDesigner.groupproj``. 
+1. Download or clone the repository and open grouped project ``src\FormDesigner.groupproj``. 
 2. Right-click on the FormDesigner.Package.dproj and choose **Install**
 3. **Form Designer** tab will appear on your Component Toolbar 
 
