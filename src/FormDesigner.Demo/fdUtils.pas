@@ -1,4 +1,4 @@
-unit Utils;
+unit fdUtils;
 
 interface
 
@@ -6,23 +6,26 @@ uses Classes, ExtCtrls, Controls, Windows, Vcl.Imaging.PngImage, Vcl.ComCtrls,
   Vcl.Graphics, System.SysUtils;
 
 function AddResourceToImageList(ImageList: TImageList; ResourceName: String): Integer;
-function AddControlToToolbar(ToolBar: TToolBar; ImageIndex: Integer; ControlName: String; ControlClass: TControlClass) : TToolButton;
+function AddControlToToolbar(ToolBar: TToolBar; AImageIndex: Integer; ControlName: String; ControlClass: TControlClass) : TToolButton;
 function FormatControlInfo(Control: TControl): String;
 
 implementation
 
-function AddControlToToolbar(ToolBar: TToolBar; ImageIndex: Integer; ControlName: String; ControlClass: TControlClass) : TToolButton;
+function AddControlToToolbar(ToolBar: TToolBar; AImageIndex: Integer; ControlName: String; ControlClass: TControlClass) : TToolButton;
 var
   Button, LastBtn: TToolButton;
   LastBtnIdx: Integer;
 begin
   Button := TToolButton.Create(ToolBar);
-  Button.ImageIndex := ImageIndex;
-  Button.Hint := ControlName;
-  Button.ShowHint := True;
-  Button.Style := tbsCheck;
-  Button.Grouped := True;
-  Button.Tag := Integer(ControlClass);
+  with Button do
+  begin
+    ImageIndex := AImageIndex;
+    Hint := ControlName;
+    ShowHint := True;
+    Style := tbsCheck;
+    Grouped := True;
+    Tag := Integer(ControlClass);
+  end;
   LastBtnIdx := ToolBar.ButtonCount - 1;
   if LastBtnIdx > -1 then
   begin

@@ -103,7 +103,7 @@
             <Form>frmComponentsForm</Form>
             <FormType>dfm</FormType>
         </DCCReference>
-        <DCCReference Include="Utils.pas"/>
+        <DCCReference Include="fdUtils.pas"/>
         <DCCReference Include="DesignForm.pas">
             <Form>frmDesignForm</Form>
             <FormType>dfm</FormType>

@@ -7,7 +7,7 @@ uses
   ComponentsForm in 'ComponentsForm.pas' {frmComponentsForm},
   Vcl.Themes,
   Vcl.Styles,
-  Utils in 'Utils.pas',
+  fdUtils in 'fdUtils.pas',
   DesignForm in 'DesignForm.pas' {frmDesignForm};
 
 {$R *.res}
