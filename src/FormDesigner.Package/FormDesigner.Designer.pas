@@ -924,8 +924,6 @@ begin
 end;
 
 procedure TFormDesigner.SetCursor(CtrlInfo: TControlInfo);
-var
-  EditWnd: HWnd;
 begin
   with CtrlInfo do
   begin
